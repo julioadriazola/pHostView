@@ -1,0 +1,14 @@
+{ // this is an example -- update values before use !!
+  "apps" : [{ 
+    "name"         : "fproc-HostView-prod",
+    "script"       : "app.js",
+    "instances"    : "1",
+    "run_as_user"  : "julio",
+    "run_as_group" : "julio",
+    "env": {
+       "NODE_ENV" : "production",
+       "DEBUG"    : "hostview*",
+	     "PORT"     : "3333",
+    }
+  }]
+}
