@@ -1,12 +1,13 @@
 { // this is an example -- update values before use !!
   "apps" : [{ 
-    "name"         : "pfile-HostView-dev",
-    "script"       : "app.js",
-    "instances"    : "1",
-    "run_as_user"  : "julio",
-    "run_as_group" : "julio",
-    "watch"        : true, // Watch mode is used to auto-reload the application after a change on a file
-    "ignore_watch" : ["node_modules","data"],
+    "name"              : "pHV-dev",
+    "script"            : "app.js",
+    "instances"         : "3",
+    "run_as_user"       : "julio",
+    "run_as_group"      : "julio",
+    "log_date_format"   : "YYYY.MM.DD HH:mm:ss.SSS",
+    // "watch"        : true, // Watch mode is used to auto-reload the application after a change on a file
+    // "ignore_watch" : ["node_modules","data",".tmp"],
     "env": {
        "NODE_ENV" : "development",
        "DEBUG"    : "hostview*",

@@ -45,7 +45,7 @@ module.exports.connections = { //All-access-granted connection
    host: 'localhost',
    user: 'julio',
    password: '123123123',
-   database: 'test',
+   database: 'test1',
    port: 5432
   },
  }
