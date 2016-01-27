@@ -20,21 +20,6 @@ module.exports = {
 			size: 260
 		},
 		
-		mac_address:{
-			type: 'string',
-			size: 260
-		},
-
-		manufacturer:{
-			type: 'string',
-			size: 260
-		},
-
-		motherboard:{
-			type: 'string',
-			size: 260
-		},
-
 		created_at:{
 			type: 'datetime'
 		},

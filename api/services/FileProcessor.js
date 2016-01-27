@@ -3,7 +3,8 @@ var child_process = require('child_process'),
     fs = require('fs'),
     mkdirp = require('mkdirp'),
     rmdir = require('rimraf'),
-    async = require('async');
+    async = require('async'),
+    sqlite = require('sqlite3').verbose();
 
 module.exports = {
 
@@ -15,6 +16,7 @@ module.exports = {
 
             // sails.log.silly("BEGIN");
             UploadedFile.findOne({where:{status: "uploaded"}, limit: 1}).populate('device').exec(function(err,upload){
+                if(err) return sails.log.error("There's some error querying files: " + err);
                 if(!upload) return sails.log.info("Nothing to process");
 
                 // sails.log.silly("FIND");
@@ -42,81 +44,73 @@ module.exports = {
         var ofn = process.cwd() + upload.file_path; //Original file name
         var fn = ofn;
 
+
         /*
-         * Create the submit folder if doesn't exist.
+         * Create a tmp folder to process the file
          */
 
-        mkdirp(path.dirname(ofn) + '/submit',function(error){
-            if(error) return sails.log.error('Failed to create submit folder: ' + error);
+        var tmpfn = path.dirname(fn) + '/.' + path.basename(fn).replace(/\./g,'') + '/' + path.basename(fn);
+        mkdirp(path.dirname(tmpfn),function(err){
+            if (err) return sails.log.error('Failed to create .' + path.basename(fn).replace(/\./g,'') + ' temp folder: ' + err);
             if(!fs.existsSync(fn)) return sails.log.warn('' + fn + ' file was not found or is been used');
-            
-            /*
-             * A temp folder to unzip the file and delete it in case of an error
-             */
-            var tmpfn= path.dirname(fn) + '/.' + path.basename(fn).replace(/\./g,'') + '/' + path.basename(fn);
-            mkdirp(path.dirname(tmpfn), function(err){
-                if (err) return sails.log.error('Failed to create .' + path.basename(fn).replace(/\./g,'') + ' temp folder: ' + err);
 
-                fs.rename(fn,tmpfn);
-                fn= tmpfn;
+            fs.rename(fn,tmpfn);
+            fn= tmpfn;
 
-                child_process.exec(
-                    "dtrx -q -f " + fn,
-                    { cwd: path.dirname(fn)},
-                    function(err, stdout, stderr){
-                        fs.rename(fn,ofn);
+            child_process.exec(
+                "dtrx -q -f " + fn,
+                { cwd: path.dirname(fn)},
+                function(err,stdout,stderr){
+                    fs.rename(tmpfn,ofn);
 
-                        if(err){
-                            rmdir(path.dirname(fn),function(){});
-                            return sails.log.error('decompressZIP task failed with file: ' + fn);
-                        }
+                    if(err){
+                        rmdir(path.dirname(fn),function(){});
+                        return sails.log.error('decompressZIP task failed with file: ' + fn);
+                    }
 
+                    unzipped = path.dirname(fn) + "/" + path.basename(fn).replace('.zip','');
+                    if(!fs.existsSync(unzipped)){
                         /*
-                         * The convention is that a <file_name>.zip must have 
+                         * Older versions convention is that a <file_name>.zip must have 
                          * a submit/<file_name> file inside.
                          */
                         unzipped = path.dirname(fn) + "/submit/" + path.basename(fn).replace('.zip','');
-                        if(!fs.existsSync(unzipped)){
-                            rmdir(path.dirname(fn),function(){});
-                            return sails.log.warn('unzipped file ' + unzipped + ' was not found from file: ' + fn);
-                        }
-
-                        /*
-                         * original destination relative to original filename
-                         */
-                        var destination = path.dirname(ofn) + '/submit/' + path.basename(unzipped);
-
-                        fs.rename(unzipped,destination);
-                        rmdir(path.dirname(fn),function(){});
-                        unzipped = destination;
-
-                        upload.unzipped = unzipped;
-                        if(unzipped.indexOf(".pcap") > -1){
-                            
-                            // FileProcessor.processPCAP(null);
-                            // fs.unlink(unzipped);
-                            /* TODO: Mark the file as processed in the DB*/
-                        }
-                        else if(unzipped.indexOf("info") > -1){
-                            // FileProcessor.processInfo(null);
-                            // fs.unlink(unzipped);
-                            /* TODO: Mark the file as processed in the DB*/
-
-                        }
-                        else if(unzipped.indexOf(".db") > -1){
-                            
-                            // FileProcessor.processDB(null);
-                            // fs.unlink(unzipped);
-                            /* TODO: Mark the file as processed in the DB*/
-
-                        }
-                        else{
-                            FileProcessor.processQuestionnaire(upload);  
+                        if(!fs.existsSync(unzipped)){ 
+                            // rmdir(path.dirname(fn),function(){});
+                            return sails.log.warn('[submit/]' + path.basename(fn).replace('.zip','') + ' unzipped file was not found from file: ' + fn);
                         }
                     }
-                ); //child_process
-            }); //mkdir tmp folder
-        }); //mkdir submit folder
+
+                    upload.unzipped = unzipped;
+                    if(unzipped.indexOf(".pcap") > -1){
+                        
+                        // FileProcessor.processPCAP(null);
+                        // fs.unlink(unzipped);
+                    }
+                    else if(unzipped.indexOf("info") > -1){
+                        // FileProcessor.processInfo(null);
+                        // fs.unlink(unzipped);
+
+                    }
+                    else if(unzipped.indexOf(".db") > -1){
+                        
+                        FileProcessor.processDB(upload);
+                        // fs.unlink(unzipped);
+
+                    }
+                    else if(unzipped.indexOf(".log") > -1){
+                        
+                        // FileProcessor.processDB(upload);
+                        // fs.unlink(unzipped);
+
+                    }
+                    else{
+                        FileProcessor.processQuestionnaire(upload);  
+                    }
+
+                }
+            )//child_process
+        })//mkdir tmp folder
     },
 
     processPCAP: function(file){
@@ -135,10 +129,158 @@ module.exports = {
     },
 
     processDB: function(file){
-        sails.log.info('processing unzipped db file: ' + file.unzipped);
+        // sails.log.info('processing unzipped db file: ' + file.unzipped);
+
+        async.waterfall([
+            function readDB(callback){
+                var db = new sqlite.Database(file.unzipped);
+                var sessions = [];
+                var connectivities = [];
+                var q='';
+                db.serialize(function(){
+
+                    var session={};
+                    var last_session=null;
+                    var tmp_s = null;
+
+                    q="SELECT COUNT(*) c FROM session";
+                    db.each(q,function(err,result){
+                        if(err) return callback(err);
+                        if(result.c == 0) return callback('Session table is empty');
+                    });
+
+                    q="SELECT * FROM session ORDER BY timestamp,event ASC;";
+                    sails.log('Building sessions');
+                    db.each(q, function(err,result){ //Results must be in order: start - stop - start - stop...
+                        if(err) return callback(err);
+                        if(!result) return callback('No results executing query: ' + err);
 
 
-        FileProcessor.doSomething(null,file);
+                        if(last_session && last_session.ended_at == result.timestamp){ 
+                            if(result.event == "start"){ //Case stop - start have the same ts
+                                tmp_s = sessions.pop
+                                last_session = null
+                            }
+                        }
+                        else if(!last_session && tmp_s){
+                            if(result.event == "stop"){ //Case stop - start - stop and the first two have the same ts
+                                tmp_s.ended_at = result.timestamp
+                                sessions.push(tmp_s);
+                                last_session = tmp_s;
+                                tmp_s = null;
+                            }
+                            else{ //Case stop - start - start have the same ts
+                                sessions.push(tmp_s);
+                                last_session = tmp_s;
+                                tmp_s = null;
+                            }
+                        }
+                        else{
+                            if(!session.started_at){
+                                if(result.event == "stop") return callback('There are overlaping sessions');
+                                session.started_at = result.timestamp;
+                            }
+                            else{
+                                if(result.event == "start") return callback('There are overlaping sessions');
+                                session.ended_at = result.timestamp;
+                                sails.log(session);
+                                sessions.push(session);
+                                last_session = session
+                                session = {}
+                            }
+                        }
+                    });
+
+                    var connectivity = {};
+                    var opened_connectivity = [];
+                    var last_connectivity = null;
+                    var tmp_c = null;
+
+                    q="SELECT * FROM connectivity ORDER BY timestamp ASC, connected DESC;";
+                    sails.log('Building connectivity');
+                    db.each(q, function(err,result){ //Results must be in order: start - stop - start - stop...
+                        if(err) return callback(err);
+                        if(!result) return callback('No results executing query: ' + err);
+
+                        //TODO : ME QUEDE AQUI---------------------------------
+                        // if(last_session && last_session.ended_at == result.timestamp){ 
+                        //     if(result.event == "start"){ //Case stop - start have the same ts
+                        //         tmp_s = sessions.pop
+                        //         last_session = null
+                        //     }
+                        // }
+                        // else if(!last_session && tmp_s){
+                        //     if(result.event == "stop"){ //Case stop - start - stop and the first two have the same ts
+                        //         tmp_s.ended_at = result.timestamp
+                        //         sessions.push(tmp_s);
+                        //         last_session = tmp_s;
+                        //         tmp_s = null;
+                        //     }
+                        //     else{ //Case stop - start - start have the same ts
+                        //         sessions.push(tmp_s);
+                        //         last_session = tmp_s;
+                        //         tmp_s = null;
+                        //     }
+                        // }
+                        // else{
+                        //     if(!session.started_at){
+                        //         if(result.event == "stop") return callback('There are overlaping sessions');
+                        //         session.started_at = result.timestamp;
+                        //     }
+                        //     else{
+                        //         if(result.event == "start") return callback('There are overlaping sessions');
+                        //         session.ended_at = result.timestamp;
+                        //         sails.log(session);
+                        //         sessions.push(session);
+                        //         last_session = session
+                        //         session = {}
+                        //     }
+                        // }
+                    });
+
+
+                });
+
+                sails.log('sessions');
+                sails.log(sessions);
+
+                
+            },
+            // function beginTransaction(callback){
+            //     UploadedFile.query("BEGIN;", function(err){
+            //         if(err) return sails.log.error("Impossible to start transaction: " + err );
+            //         callback(null);
+            //     });
+            // },
+
+            // function readJSON(callback){
+            //     fs.readFile(file.unzipped,'utf8',function(err,data){
+            //         if (err) return callback(err);
+            //         return callback(null,JSON.parse(data));
+            //     });
+            // },
+        ],
+        function(err){
+            return FileProcessor.doSomething(err,file)
+        });
+
+
+        //     db.serialize(function(){
+
+        //         sails.log.silly('Process session');
+        //         sqlitedb.each("SELECT * FROM session", function(err, r) {
+
+        //             if (!r || err)
+        //                 return;
+        //             r.id = id;
+        //             delete r.dnssuffix;
+        //             client.insert('connectivity',r).run(icb);
+        //         });
+
+        //     }); //db.serialize
+
+
+        // FileProcessor.doSomething(null,file);
     },
 
     processQuestionnaire: function(file){
@@ -225,7 +367,9 @@ module.exports = {
         /*
          * IMPORTANT: Uncomment the next line;
          */
-        // fs.unlink(files[i].unzipped);
+        // fs.unlink(file.unzipped);
+
+        // sails.log('ERROR: ' + err);
         if(err) {
             file.status = "errored";
             sails.log.error("There was some problem processing the file with id: " + file.id);
