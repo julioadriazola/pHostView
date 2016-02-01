@@ -137,6 +137,9 @@ module.exports = {
                 var sessions = [];
                 var connectivities = [];
                 var q='';
+
+                var start_events = ['start','restart'];
+                var stop_events = ['pause','stop'];
                 db.serialize(function(){
 
                     var session={};
@@ -153,17 +156,17 @@ module.exports = {
                     sails.log('Building sessions');
                     db.each(q, function(err,result){ //Results must be in order: start - stop - start - stop...
                         if(err) return callback(err);
-                        if(!result) return callback('No results executing query: ' + err);
+                        if(!result) return callback('No results executing query: ' + q);
 
 
                         if(last_session && last_session.ended_at == result.timestamp){ 
-                            if(result.event == "start"){ //Case stop - start have the same ts
+                            if(start_events.indexOf(result.event) > -1){ //Case stop - start have the same ts
                                 tmp_s = sessions.pop
                                 last_session = null
                             }
                         }
                         else if(!last_session && tmp_s){
-                            if(result.event == "stop"){ //Case stop - start - stop and the first two have the same ts
+                            if(stop_events.indexOf(result.event) > -1){ //Case stop - start - stop and the first two have the same ts
                                 tmp_s.ended_at = result.timestamp
                                 sessions.push(tmp_s);
                                 last_session = tmp_s;
@@ -177,13 +180,30 @@ module.exports = {
                         }
                         else{
                             if(!session.started_at){
-                                if(result.event == "stop") return callback('There are overlaping sessions');
+                                if(stop_events.indexOf(result.event) > -1) return callback('There are overlaping sessions');
                                 session.started_at = result.timestamp;
                             }
                             else{
-                                if(result.event == "start") return callback('There are overlaping sessions');
+                                if(start_events.indexOf(result.event) > -1) return callback('There are overlaping sessions');
                                 session.ended_at = result.timestamp;
-                                sails.log(session);
+
+
+
+                                session.connections = [];
+                                session.activity = [];
+                                session.battery = [];
+                                session.browseractivity = [];
+                                session.dns = [];
+                                session.http = [];
+                                session.io = [];
+                                session.ports = [];
+                                session.procs = [];
+                                session.sysinfo = [];
+                                session.wifistats = [];
+
+
+
+
                                 sessions.push(session);
                                 last_session = session
                                 session = {}
@@ -191,74 +211,230 @@ module.exports = {
                         }
                     });
 
-                    var connectivity = {};
-                    var opened_connectivity = [];
+                    var connectivity = null;
                     var last_connectivity = null;
-                    var tmp_c = null;
+                    var last_mac = null;
+                    // var tmp_c = null;
 
-                    q="SELECT * FROM connectivity ORDER BY timestamp ASC, connected DESC;";
-                    sails.log('Building connectivity');
-                    db.each(q, function(err,result){ //Results must be in order: start - stop - start - stop...
+                   q=`SELECT 
+                        a.*,
+                        l.ip,
+                        l.rdns,
+                        l.asnumber,
+                        l.asname,
+                        l.countryCode,
+                        l.city,
+                        l.lat,
+                        l.lon,
+                        l.timestamp l_timestamp,
+                        a.timestamp as started_at,
+                        (
+                        Select MIN(timestamp) 
+                        FROM connectivity 
+                        WHERE connected = 0
+                            AND a.name = name
+                            AND a.friendlyname = friendlyname
+                            AND a.description = description
+                            AND a.dnssuffix = dnssuffix
+                            AND a.mac = mac
+                            AND a.ips = ips
+                            AND a.gateways = gateways
+                            AND a.dnses = dnses
+                            AND a.ssid = ssid
+                            AND a.bssid = bssid
+                            AND a.bssidtype = bssidtype
+                            AND a.timestamp <= timestamp
+                        ) as ended_at
+                        FROM connectivity a
+                        LEFT JOIN location l
+                             ON l.timestamp = a.timestamp
+                        WHERE a.connected = 1
+                        ORDER BY a.mac, started_at ASC, ended_at ASC;`;
+
+                    // q=`SELECT 
+                    //     a.*,
+
+
+
+                    //     (
+                    //         Select MIN(timestamp) 
+                    //         FROM connectivity 
+                    //         WHERE connected = 0
+                    //             AND a.name = name
+                    //             AND a.friendlyname = friendlyname
+                    //             AND a.description = description
+                    //             AND a.dnssuffix = dnssuffix
+                    //             AND a.mac = mac
+                    //             AND a.ips = ips
+                    //             AND a.gateways = gateways
+                    //             AND a.dnses = dnses
+                    //             AND a.ssid = ssid
+                    //             AND a.bssid = bssid
+                    //             AND a.bssidtype = bssidtype
+                    //             AND a.timestamp <= timestamp
+                    //     ) as ended_at,
+                    //     timestamp as started_at
+
+                    //     FROM connectivity a
+                    //     WHERE a.connected = 1
+                    //     ORDER BY a.mac, started_at ASC, ended_at ASC;`;
+
+                    sails.log('Building connectivity and locations');
+                    db.each(q, function(err,result){
                         if(err) return callback(err);
-                        if(!result) return callback('No results executing query: ' + err);
+                        if(!result) return callback('No results executing query: ' + q);
 
-                        //TODO : ME QUEDE AQUI---------------------------------
-                        // if(last_session && last_session.ended_at == result.timestamp){ 
-                        //     if(result.event == "start"){ //Case stop - start have the same ts
-                        //         tmp_s = sessions.pop
-                        //         last_session = null
+                        if(result.mac != last_mac){
+                            last_mac = result.mac;
+                            last_connectivity = null
+                        }
+
+                        if(!result.ended_at) result.ended_at = Infinity;
+
+                        if(last_connectivity && last_connectivity.ended_at < Infinity && result.started_at < last_connectivity.ended_at){
+                            /*
+                             * Merging connections can produce lost information. First merge: Only connections with an end timestamp
+                             */
+                            sails.log.warn('There are overlaping connectivities. These have been merged.');
+                            connectivity = connectivities.pop();
+                            if(connectivity.ended_at < result.ended_at ) connectivity.ended_at = result.ended_at
+                        }
+                        else{
+                            connectivity = result;
+                        }
+
+                        connectivities.push(connectivity);
+                        last_connectivity = connectivity;
+
+                    });
+
+                    q='Select 1=1;';
+                    db.each(q, function(err,result){
+                        var conn = null;
+                        while(connectivities.length > 0){
+                            conn = connectivities.shift();
+                            
+                            if(conn.ended_at == Infinity){
+                                var best_i=-1;
+                                var best_diff=Infinity;
+                                for(var i = 0; i < sessions.length; i++){
+                                    if(sessions[i].started_at <= conn.started_at && conn.started_at - sessions[i].started_at < best_diff){
+                                        best_diff= conn.started_at - sessions[i].started_at;
+                                        conn.ended_at  = sessions[i].ended_at; //Same end timestamp for connection and session
+                                        best_i = i;
+                                    }
+                                }
+                                sessions[best_i].connections.push(conn);
+                            }
+                            else{
+                                var finished = false;
+                                for(var i = 0; i < sessions.length; i++){
+                                    if(sessions[i].started_at <= conn.started_at && sessions[i].ended_at >= conn.ended_at){
+                                        sessions[i].connections.push(conn);
+                                        finished = true;
+                                        break;
+                                    }
+                                }
+                                if(!finished) sails.log.error("There's a connection starting in a session and ending in the next one");
+                            }
+
+
+
+                        }
+
+                        /*ONLY FOR TEST (Can be commented)*/
+                        // for(var i = 0; i < sessions.length; i++){
+                        //     for(var j = 0; j < sessions[i].connections.length ; j++){
+                        //         if(sessions[i].started_at > sessions[i].connections[j].started_at || sessions[i].ended_at < sessions[i].connections[j].ended_at) sails.log.warn("There's some incoherencies between sessions and connections");
                         //     }
                         // }
-                        // else if(!last_session && tmp_s){
-                        //     if(result.event == "stop"){ //Case stop - start - stop and the first two have the same ts
-                        //         tmp_s.ended_at = result.timestamp
-                        //         sessions.push(tmp_s);
-                        //         last_session = tmp_s;
-                        //         tmp_s = null;
-                        //     }
-                        //     else{ //Case stop - start - start have the same ts
-                        //         sessions.push(tmp_s);
-                        //         last_session = tmp_s;
-                        //         tmp_s = null;
-                        //     }
-                        // }
-                        // else{
-                        //     if(!session.started_at){
-                        //         if(result.event == "stop") return callback('There are overlaping sessions');
-                        //         session.started_at = result.timestamp;
-                        //     }
-                        //     else{
-                        //         if(result.event == "start") return callback('There are overlaping sessions');
-                        //         session.ended_at = result.timestamp;
-                        //         sails.log(session);
-                        //         sessions.push(session);
-                        //         last_session = session
-                        //         session = {}
+
+                        // for(var i = 0; i < sessions.length; i++){
+                        //     sails.log('-=-=-=-=-=-=-=-=-=-=-=-=-');
+                        //     sails.log(sessions[i].started_at)
+                        //     sails.log(sessions[i].ended_at)
+                        //     for(var j = 0; j < sessions[i].connections.length ; j++){
+                        //         sails.log(sessions[i].connections[j]);
                         //     }
                         // }
                     });
 
 
+
+
+                    /*
+                     * The idea is to make a join like in the merge sort algorithm.
+                     * So, there's a session array ordered and a X array (activity,battery,etc.) ordered.
+                     * It shouldn't happen that one of this records doesn't match in a session, 
+                     * so j starts from i value in the for.
+                     */
+                    var processQuery = function(table){
+
+                        q = "Select * FROM " + table + " ORDER BY timestamp ASC;";
+                        var i = 0;
+                        db.each(q, function(err,result){
+                            if(err) return callback(err);
+                            if(!result) return callback('No results executing query: ' + q);
+
+                            if(sessions[i].started_at <= result.timestamp && sessions[i].ended_at >= result.timestamp){
+                                sessions[i][table].push(result);
+                            }
+                            else{
+                                for(var j = i; j < sessions.length; j++ ){
+                                    if(sessions[j].started_at <= result.timestamp && sessions[j].ended_at >= result.timestamp){
+                                        sessions[j][table].push(result);
+                                        i=j;
+                                        break;
+                                    }
+                                }
+                            }
+                        });
+
+                        // db.each('SELECT 1=1;',function(e,l){
+                        //     for(var l = 0; l < sessions.length; l++){
+                        //         sails.log('-=-=-=-=-=-=-=-=-=-=-=-=-');
+                        //         sails.log(sessions[l].started_at)
+                        //         sails.log(sessions[l].ended_at)
+                        //         for(var j = 0; j < sessions[l][table].length ; j++){
+                        //             sails.log(sessions[l][table][j].timestamp);
+                        //         }
+                        //     }
+                        // })
+                    };
+
+                    sails.log('Building other tables');
+                    processQuery('activity');
+                    processQuery('battery');
+                    processQuery('browseractivity');
+                    processQuery('dns');
+                    processQuery('http');
+                    processQuery('io');
+                    processQuery('ports');
+                    processQuery('procs');
+                    processQuery('sysinfo');
+                    processQuery('wifistats');
+
                 });
 
-                sails.log('sessions');
-                sails.log(sessions);
+                db.close(function(err) {
+                    if (err)
+                        return callback("failed to close sqlite3: " + err);
+                    return callback(null,sessions);
+                });
 
-                
             },
-            // function beginTransaction(callback){
-            //     UploadedFile.query("BEGIN;", function(err){
-            //         if(err) return sails.log.error("Impossible to start transaction: " + err );
-            //         callback(null);
-            //     });
-            // },
+            function beginTransaction(sessions,callback){
+                sails.log(sessions);
+                UploadedFile.query("BEGIN;", function(err){
+                    if(err) return sails.log.error("Impossible to start transaction: " + err );
+                    callback(null,sessions);
+                });
+            },
+            function createCompleteSession(sesisons,callback){
+                var session = sessions.shift();
 
-            // function readJSON(callback){
-            //     fs.readFile(file.unzipped,'utf8',function(err,data){
-            //         if (err) return callback(err);
-            //         return callback(null,JSON.parse(data));
-            //     });
-            // },
+                //TODO: Procesar aqui
+            }
         ],
         function(err){
             return FileProcessor.doSomething(err,file)
