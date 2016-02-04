@@ -251,34 +251,6 @@ module.exports = {
                         WHERE a.connected = 1
                         ORDER BY a.mac, started_at ASC, ended_at ASC;`;
 
-                    // q=`SELECT 
-                    //     a.*,
-
-
-
-                    //     (
-                    //         Select MIN(timestamp) 
-                    //         FROM connectivity 
-                    //         WHERE connected = 0
-                    //             AND a.name = name
-                    //             AND a.friendlyname = friendlyname
-                    //             AND a.description = description
-                    //             AND a.dnssuffix = dnssuffix
-                    //             AND a.mac = mac
-                    //             AND a.ips = ips
-                    //             AND a.gateways = gateways
-                    //             AND a.dnses = dnses
-                    //             AND a.ssid = ssid
-                    //             AND a.bssid = bssid
-                    //             AND a.bssidtype = bssidtype
-                    //             AND a.timestamp <= timestamp
-                    //     ) as ended_at,
-                    //     timestamp as started_at
-
-                    //     FROM connectivity a
-                    //     WHERE a.connected = 1
-                    //     ORDER BY a.mac, started_at ASC, ended_at ASC;`;
-
                     sails.log('Building connectivity and locations');
                     db.each(q, function(err,result){
                         if(err) return callback(err);
@@ -335,7 +307,7 @@ module.exports = {
                                         break;
                                     }
                                 }
-                                if(!finished) sails.log.error("There's a connection starting in a session and ending in the next one");
+                                if(!finished) sails.log.error("There's a connection starting in a session and ending in the next one. This was ommited.");
                             }
 
 
@@ -389,17 +361,6 @@ module.exports = {
                                 }
                             }
                         });
-
-                        // db.each('SELECT 1=1;',function(e,l){
-                        //     for(var l = 0; l < sessions.length; l++){
-                        //         sails.log('-=-=-=-=-=-=-=-=-=-=-=-=-');
-                        //         sails.log(sessions[l].started_at)
-                        //         sails.log(sessions[l].ended_at)
-                        //         for(var j = 0; j < sessions[l][table].length ; j++){
-                        //             sails.log(sessions[l][table][j].timestamp);
-                        //         }
-                        //     }
-                        // })
                     };
 
                     sails.log('Building other tables');
@@ -423,15 +384,8 @@ module.exports = {
                 });
 
             },
-            function beginTransaction(sessions,callback){
-                sails.log(sessions);
-                UploadedFile.query("BEGIN;", function(err){
-                    if(err) return sails.log.error("Impossible to start transaction: " + err );
-                    callback(null,sessions);
-                });
-            },
-            function createCompleteSession(sesisons,callback){
-                var session = sessions.shift();
+            function createCompleteSession(sessions,callback){
+                Session.createCompleteSession(sessions, file, callback);
 
                 //TODO: Procesar aqui
             }
@@ -440,23 +394,6 @@ module.exports = {
             return FileProcessor.doSomething(err,file)
         });
 
-
-        //     db.serialize(function(){
-
-        //         sails.log.silly('Process session');
-        //         sqlitedb.each("SELECT * FROM session", function(err, r) {
-
-        //             if (!r || err)
-        //                 return;
-        //             r.id = id;
-        //             delete r.dnssuffix;
-        //             client.insert('connectivity',r).run(icb);
-        //         });
-
-        //     }); //db.serialize
-
-
-        // FileProcessor.doSomething(null,file);
     },
 
     processQuestionnaire: function(file){
@@ -556,22 +493,22 @@ module.exports = {
             sails.log.info("File with id: " + file.id + " was processed successfully");
         }
         
-        UploadedFile.query("BEGIN;", function(err){
-            if(err) return sails.log.error("Impossible to start transaction: " + err );
+        // UploadedFile.query("BEGIN;", function(err){
+        //     if(err) return sails.log.error("Impossible to start transaction: " + err );
             // sails.log.silly("BEGIN");
-            UploadedFile.update({id: file.id},{status: file.status, updated_at: new Date()}).exec(function(err,updated){
+        UploadedFile.update({id: file.id},{status: file.status, updated_at: new Date()}).exec(function(err,updated){
 
-                if(err) UploadedFile.query("ROLLBACK;",function(err){ /*sails.log.silly("ROLLBACK at end")*/});
-                // sails.log.silly("UPDATE");
-                UploadedFile.query("COMMIT;",function(err){
-                    if(err) {
-                        sails.log.error("ABORTING PROCESS...");
-                        sails.log.error("Something went wrong with file id: " + upload.id);
-                    }
-                    // sails.log.silly("COMMIT");
-                });
+                // if(err) UploadedFile.query("ROLLBACK;",function(err){ /*sails.log.silly("ROLLBACK at end")*/});
+                // // sails.log.silly("UPDATE");
+                // UploadedFile.query("COMMIT;",function(err){
+                //     if(err) {
+                //         sails.log.error("ABORTING PROCESS...");
+                //         sails.log.error("Something went wrong with file id: " + upload.id);
+                //     }
+                //     // sails.log.silly("COMMIT");
+                // });
             });//UPDATE
-        });//BEGIN TRANSACTION
+        // });//BEGIN TRANSACTION
 
 
 
