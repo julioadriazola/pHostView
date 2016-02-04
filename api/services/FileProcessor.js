@@ -99,6 +99,9 @@ module.exports = {
          * it's being used for another process, it's not possible to find file inside [the unzipped one],
          * etc.). Files with this status can be processed later.
          *
+         * failed: means that there was a problem processing the unzipped file, for example, a database problem,
+         * that means there's no format problem apparently.
+         *
          * processed: means that the file was processed succesfully without problems.
          *
          * processing: means that the file is being processed. It can't be processed for more than one thread.
@@ -106,8 +109,8 @@ module.exports = {
          * arised and was not catched.
          */
 
-        if(file.status == 'waitingFile'){
-            sails.log.warn("File with id: " + file.id + " was marked as waitingFile.");
+        if(file.status == 'waitingFile' || file.status == 'failed' ){
+            sails.log.warn("File with id: " + file.id + " was marked as "+ file.status+".");
             if(file.error_info) sails.log.warn(file.error_info)
         }
         else if(err) {

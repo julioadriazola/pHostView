@@ -80,8 +80,13 @@ module.exports = {
 
     	if(values.length>0)
 	    	pgsql.insert(table,values).returning('*').rows(function(err,inserted_values){
+
+
 	    		if(err) return sails.log.error("There's some error inserting "+ table +": " + err);
 	    		sails.log.info('Rows inserted in table '+table+': ' + inserted_values.length + ' (' + inserted_values[0].id + '-' + inserted_values[inserted_values.length - 1].id + ')');
+
+
+	    		
 	    		if(nextFunction) nextFunction(err,inserted_values);
 	    	});
 	    else {

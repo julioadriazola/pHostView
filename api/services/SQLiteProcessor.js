@@ -3,7 +3,6 @@ var async = require('async'),
 
 module.exports = {
 	process: function(file){
-	    // sails.log.info('processing unzipped db file: ' + file.unzipped);
 
 	    async.waterfall([
 		    /*
@@ -13,7 +12,7 @@ module.exports = {
 	        function readDB(callback){
 	            var db = new sqlite.Database(file.unzipped);
 	            var sessions = [];
-	            var connectivities = [];
+	            var connections = [];
 	            var q='';
 
 	            /*TODO: Ask Anna the different start/stop events */
@@ -35,7 +34,10 @@ module.exports = {
 	                });
 
 	                q="SELECT * FROM session ORDER BY timestamp,event ASC;";
-	                sails.log('Building sessions');
+	                
+	                /*
+	                 * BUILDING SESSIONS
+	                 */
 	                db.each(q, function(err,result){ //Results must be in order: start - stop - start - stop...
 	                    if(err) return callback(err);
 	                    if(!result) return callback('No results executing query: ' + q);
@@ -88,8 +90,8 @@ module.exports = {
 	                    }
 	                });
 
-	                var connectivity = null;
-	                var last_connectivity = null;
+	                var connection = null;
+	                var last_connection = null;
 	                var last_mac = null;
 
 	                /*TODO: Review this: probably there're more columns in the where of subquery*/
@@ -110,17 +112,17 @@ module.exports = {
 	                    FROM connectivity 
 	                    WHERE connected = 0
 	                        AND a.name = name
-	                        AND a.friendlyname = friendlyname
-	                        AND a.description = description
-	                        AND a.dnssuffix = dnssuffix
+	                        --AND a.friendlyname = friendlyname
+	                        --AND a.description = description
+	                        --AND a.dnssuffix = dnssuffix
 	                        AND a.mac = mac
-	                        AND a.ips = ips
-	                        AND a.gateways = gateways
-	                        AND a.dnses = dnses
-	                        AND a.ssid = ssid
-	                        AND a.bssid = bssid
-	                        AND a.bssidtype = bssidtype
-	                        AND a.timestamp <= timestamp
+	                        --AND a.ips = ips
+	                        --AND a.gateways = gateways
+	                        --AND a.dnses = dnses
+	                        --AND a.ssid = ssid
+	                        --AND a.bssid = bssid
+	                        --AND a.bssidtype = bssidtype
+	                        --AND a.timestamp <= timestamp
 	                    ) as ended_at
 	                    FROM connectivity a
 	                    LEFT JOIN location l
@@ -128,40 +130,45 @@ module.exports = {
 	                    WHERE a.connected = 1
 	                    ORDER BY a.mac, started_at ASC, ended_at ASC;`;
 
-	                sails.log('Building connectivity and locations');
+	                /*
+	                 * BUILDING CONNECTIONS AND LOCATIONS
+	                 */
 	                db.each(q, function(err,result){
 	                    if(err) return callback(err);
 	                    if(!result) return callback('No results executing query: ' + q);
 
 	                    if(result.mac != last_mac){
 	                        last_mac = result.mac;
-	                        last_connectivity = null
+	                        last_connection = null
 	                    }
 
 	                    if(!result.ended_at) result.ended_at = Infinity;
 
-	                    if(last_connectivity && last_connectivity.ended_at < Infinity && result.started_at < last_connectivity.ended_at){
+	                    if(last_connection && last_connection.ended_at < Infinity && result.started_at < last_connection.ended_at){
 	                        /*
 	                         * Merging connections can produce lost information. First merge: Only connections with an end timestamp
 	                         */
-	                        sails.log.warn('There are overlaping connectivities. These have been merged.');
-	                        connectivity = connectivities.pop();
-	                        if(connectivity.ended_at < result.ended_at ) connectivity.ended_at = result.ended_at
+	                        sails.log.warn('There are overlaping connections. These have been merged.');
+	                        connection = connections.pop();
+	                        if(connection.ended_at < result.ended_at ) connection.ended_at = result.ended_at
 	                    }
 	                    else{
-	                        connectivity = result;
+	                        connection = result;
 	                    }
 
-	                    connectivities.push(connectivity);
-	                    last_connectivity = connectivity;
+	                    connections.push(connection);
+	                    last_connection = connection;
 
 	                });
 
-	                q='Select 1=1;'; //db.serialize run somethi
+	                q='Select 1=1;';
+	                /*
+	                 * DO SOME PROCESSING: if run this code out of a db.each, it'll run in parallel so connections array will not exist.
+	                 */
 	                db.each(q, function(err,result){
 	                    var conn = null;
-	                    while(connectivities.length > 0){
-	                        conn = connectivities.shift();
+	                    while(connections.length > 0){
+	                        conn = connections.shift();
 	                        
 	                        if(conn.ended_at == Infinity){
 	                            var best_i=-1;
@@ -187,7 +194,7 @@ module.exports = {
 	                            if(!finished) sails.log.error("There's a connection starting in a session and ending in the next one. This was ommited.");
 	                        }
 
-	                    } // while connectivities.length > 0
+	                    } // while connections.length > 0
 	                });
 
 
@@ -235,7 +242,7 @@ module.exports = {
 	            });
 
 	            db.close(function(err) {
-	                if (err) return callback("failed to close sqlite3: " + err);
+	                if (err) return callback("Failed to close sqlite3: " + err);
 	                return callback(null,sessions);
 	            });
 
@@ -276,7 +283,11 @@ module.exports = {
     				var createConnection = function(location_id,connection){
     					connection.location_id = location_id;
     					DB.insertOne('connections',connection,function(err,con_c){
-    						if(err) return sails.log.error("There's some error inserting connections: " + err);
+    						if(err){
+    							file.status = 'failed'
+    							file.error_info =  "There's some error inserting connections: " + err
+    							return callback(file.error_info)
+    						}
     						sails.log.info("Connection inserted with id: " + con_c.id);
     					});
     				}
@@ -322,11 +333,19 @@ module.exports = {
     						loc.longitude = cwl.lon.trim();
 
     						DB.selectOne('locations',loc, function(err,res){
-    							if(err) return sails.log.error("There's some error querying locations: " + err);
+    							if(err){
+    								file.status = 'failed'
+    								file.error_info =  "There's some error querying locations: " + err
+    								return callback(file.error_info)
+    							}
     							if(res.rows.length > 0) createConnection(res.rows[0].id,conn);
 
     							DB.insertOne('locations',loc,function(err,loc_c){
-									if(err) return sails.log.error("There's some error inserting locations: " + err);
+    								if(err){
+    									file.status = 'failed'
+    									file.error_info =  "There's some error inserting locations: " + err
+    									return callback(file.error_info)
+    								}
 									createConnection(loc_c.id,conn);
 								});
     						});
@@ -566,12 +585,15 @@ module.exports = {
 
     		],
     		function(err){
-    			if(err) return;
+    			if(err) return cb(err);
     			return SQLiteProcessor.createCompleteSession(sessions,file,cb);
     		});
     	} //if sessions.length > 0 
     	else{
-    		sails.log('TERMINO EN TEORIA');
+    		/*
+    		 * This 'cb' is the callback provided to createCompleteSession function.
+    		 * Basically: When it's no more sessions to process, go to the next file.
+    		 */
     		return cb(null);
     	}
     },
