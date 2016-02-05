@@ -14,15 +14,19 @@ module.exports = {
 	            var sessions = [];
 	            var connections = [];
 	            var q='';
+	            var opened_session = false;
 
-	            /*TODO: Ask Anna the different start/stop events */
-	            var start_events = ['start','restart'];
-	            var stop_events = ['pause','stop'];
 	            db.serialize(function(){
 
+	            	/*
+	            	 * TODO: A file must have only one session.
+	            	 * Actually, there's more than one session in a file.
+	            	 * When this bug is fixed, some code must be rewrited.  
+	            	 */
 	                var session={};
 	                var last_session=null;
 	                var tmp_s = null;
+
 
 	                q="SELECT COUNT(*) c FROM session";
 	                db.each(q,function(err,result){
@@ -33,102 +37,87 @@ module.exports = {
 	                    }
 	                });
 
-	                q="SELECT * FROM session ORDER BY timestamp,event ASC;";
-	                
+	                q=`SELECT
+							a.timestamp started_at,
+							a.event start_event,
+							MIN(b.timestamp) ended_at,
+							b.event stop_event
+						FROM session  a
+						LEFT JOIN session b
+							ON a.timestamp < b.timestamp
+							AND b.event IN ('pause','stop')
+						WHERE a.event IN ('start','restart')
+						GROUP BY a.timestamp,a.event
+						ORDER BY a.timestamp ASC`;
 	                /*
 	                 * BUILDING SESSIONS
 	                 */
-	                db.each(q, function(err,result){ //Results must be in order: start - stop - start - stop...
+	                db.each(q, function(err,result){ //Results must be in order
 	                    if(err) return callback(err);
 	                    if(!result) return callback('No results executing query: ' + q);
 
+	                   	if(!result.ended_at) {
+	                   		if(opened_session) {
+	                   			file.error_info = "There are 2 or more sessions opened"
+	                   			return callback(file.error_info);
+	                   		}
 
-	                    if(last_session && last_session.ended_at == result.timestamp){ 
-	                        if(start_events.indexOf(result.event) > -1){ //Case stop - start have the same ts
-	                            tmp_s = sessions.pop
-	                            last_session = null
-	                        }
-	                    }
-	                    else if(!last_session && tmp_s){
-	                        if(stop_events.indexOf(result.event) > -1){ //Case stop - start - stop and the first two have the same ts
-	                            tmp_s.ended_at = result.timestamp
-	                            sessions.push(tmp_s);
-	                            last_session = tmp_s;
-	                            tmp_s = null;
-	                        }
-	                        else{ //Case stop - start - start have the same ts
-	                            sessions.push(tmp_s);
-	                            last_session = tmp_s;
-	                            tmp_s = null;
-	                        }
+	                   		result.ended_at = Infinity;
+	                   		result.stop_event = 'crash';
+	                   	}
+
+	                    tmp_s = result
+
+	                    if(last_session && last_session.ended_at < Infinity && result.started_at < last_session.ended_at){
+	                        sails.log.warn('There are overlaping sessions. These have been merged.');
+	                        session = sessions.pop();
+	                        if(session.ended_at < result.ended_at ) session.ended_at = result.ended_at
 	                    }
 	                    else{
-	                        if(!session.started_at){
-	                            if(stop_events.indexOf(result.event) > -1) return callback('There are overlaping sessions');
-	                            session.started_at = result.timestamp;
-	                        }
-	                        else{
-	                            if(start_events.indexOf(result.event) > -1) return callback('There are overlaping sessions');
-	                            session.ended_at = result.timestamp;
-
-	                            session.connections = [];
-	                            session.activity = [];
-	                            session.battery = [];
-	                            session.browseractivity = [];
-	                            session.dns = [];
-	                            session.http = [];
-	                            session.io = [];
-	                            session.ports = [];
-	                            session.procs = [];
-	                            session.sysinfo = [];
-	                            session.wifistats = [];
-
-	                            sessions.push(session);
-	                            last_session = session
-	                            session = {}
-	                        }
+	                        session = result;
+	                        session.connections = [];
+	                        session.activity = [];
+	                        session.battery = [];
+	                        session.browseractivity = [];
+	                        session.io = [];
+	                        session.ports = [];
+	                        session.procs = [];
+	                        session.sysinfo = [];
+	                        session.wifistats = [];
 	                    }
+
+	                    sessions.push(session);
+	                    last_session = session;
+
 	                });
 
 	                var connection = null;
 	                var last_connection = null;
 	                var last_mac = null;
 
-	                /*TODO: Review this: probably there're more columns in the where of subquery*/
-	               q=`SELECT 
-	                    a.*,
-	                    l.ip,
-	                    l.rdns,
-	                    l.asnumber,
-	                    l.asname,
-	                    l.countryCode,
-	                    l.city,
-	                    l.lat,
-	                    l.lon,
-	                    l.timestamp l_timestamp,
-	                    a.timestamp as started_at,
-	                    (
-	                    Select MIN(timestamp) 
-	                    FROM connectivity 
-	                    WHERE connected = 0
-	                        AND a.name = name
-	                        --AND a.friendlyname = friendlyname
-	                        --AND a.description = description
-	                        --AND a.dnssuffix = dnssuffix
-	                        AND a.mac = mac
-	                        --AND a.ips = ips
-	                        --AND a.gateways = gateways
-	                        --AND a.dnses = dnses
-	                        --AND a.ssid = ssid
-	                        --AND a.bssid = bssid
-	                        --AND a.bssidtype = bssidtype
-	                        --AND a.timestamp <= timestamp
-	                    ) as ended_at
-	                    FROM connectivity a
-	                    LEFT JOIN location l
-	                         ON l.timestamp = a.timestamp
-	                    WHERE a.connected = 1
-	                    ORDER BY a.mac, started_at ASC, ended_at ASC;`;
+	               q=`Select 
+							a.*,
+							l.ip,
+							l.rdns,
+							l.asnumber,
+							l.asname,
+							l.countryCode,
+							l.city,
+							l.lat,
+							l.lon,
+							l.timestamp l_timestamp,
+							a.timestamp started_at,
+							MIN(b.timestamp) ended_at 
+						FROM connectivity a
+						LEFT JOIN connectivity b
+							ON a.mac = b.mac
+							AND b.connected = 0
+							AND a.timestamp <= b.timestamp
+						LEFT JOIN location l 
+							ON a.timestamp = l.timestamp
+						WHERE a.connected = 1
+						GROUP BY a.timestamp
+						ORDER BY a.mac ASC, started_at ASC, ended_at ASC`;
 
 	                /*
 	                 * BUILDING CONNECTIONS AND LOCATIONS
@@ -154,6 +143,8 @@ module.exports = {
 	                    }
 	                    else{
 	                        connection = result;
+	                        connection.dns = [];
+	                        connection.http = [];
 	                    }
 
 	                    connections.push(connection);
@@ -164,29 +155,31 @@ module.exports = {
 	                q='Select 1=1;';
 	                /*
 	                 * DO SOME PROCESSING: if run this code out of a db.each, it'll run in parallel so connections array will not exist.
+	                 * Assign each connection an "i" value corresponding to her final best-fit session, and add an ended_at if it's Infinity
 	                 */
 	                db.each(q, function(err,result){
-	                    var conn = null;
-	                    while(connections.length > 0){
-	                        conn = connections.shift();
+	                    // var conn = null;
+	                    for( var i = 0; i < connections.length; i++){
+	                        // conn = connections.shift();
 	                        
-	                        if(conn.ended_at == Infinity){
-	                            var best_i=-1;
+	                        if(connections[i].ended_at == Infinity){
+	                            var best_j=-1;
 	                            var best_diff=Infinity;
-	                            for(var i = 0; i < sessions.length; i++){
-	                                if(sessions[i].started_at <= conn.started_at && conn.started_at - sessions[i].started_at < best_diff){
-	                                    best_diff= conn.started_at - sessions[i].started_at;
-	                                    conn.ended_at  = sessions[i].ended_at; //Same end timestamp for connection and session
-	                                    best_i = i;
+	                            for(var j = 0; j < sessions.length; j++){
+	                                if(sessions[j].started_at <= connections[i].started_at && connections[i].started_at - sessions[j].started_at < best_diff){
+	                                    best_diff= connections[i].started_at - sessions[j].started_at;
+	                                    connections[i].ended_at  = sessions[j].ended_at; //Same end timestamp for connection and session
+	                                    best_j = j;
 	                                }
 	                            }
-	                            sessions[best_i].connections.push(conn);
+
+	                            connections[i].session_key = best_j;
 	                        }
 	                        else{
 	                            var finished = false;
-	                            for(var i = 0; i < sessions.length; i++){
-	                                if(sessions[i].started_at <= conn.started_at && sessions[i].ended_at >= conn.ended_at){
-	                                    sessions[i].connections.push(conn);
+	                            for(var j = 0; j < sessions.length; j++){
+	                                if(sessions[j].started_at <= connections[i].started_at && sessions[j].ended_at >= connections[i].ended_at){
+	                                	connections[i].session_key = j;
 	                                    finished = true;
 	                                    break;
 	                                }
@@ -194,17 +187,17 @@ module.exports = {
 	                            if(!finished) sails.log.error("There's a connection starting in a session and ending in the next one. This was ommited.");
 	                        }
 
-	                    } // while connections.length > 0
+	                    }
 	                });
 
 
-
-
 	                /*
-	                 * The processQuery assumes that both, sessions and X table (battery, activities,etc.)
+	                 * The processQuery assumes that both, into and from tables (from: battery, activities,etc.)
 	                 * are ordered by timestamp.
+	                 * This function basically adds de table elements to his respective into object.
 	                 */
-	                var processQuery = function(table){
+	                 //There can be only one opened session (it's assumed that the last one).
+	                var insertIntoSessions = function(table){
 
 	                    q = "Select * FROM " + table + " ORDER BY timestamp ASC;";
 	                    var i = 0;
@@ -227,34 +220,66 @@ module.exports = {
 	                    });
 	                };
 
+	                var insertIntoConnections = function(table){
+
+	                    q = "Select * FROM " + table + " ORDER BY timestamp ASC;";
+	                    var i = 0;
+	                    db.each(q, function(err,result){
+	                        if(err) return callback(err);
+	                        if(!result) return callback('No results executing query: ' + q);
+
+	                        if(connections[i].started_at <= result.timestamp && connections[i].ended_at >= result.timestamp){
+	                            connections[i][table].push(result);
+	                        }
+	                        else{
+	                            for(var j = i; j < sessions.length; j++ ){
+	                                if(connections[j].started_at <= result.timestamp && connections[j].ended_at >= result.timestamp){
+	                                    connections[j][table].push(result);
+	                                    i=j;
+	                                    break;
+	                                }
+	                            }
+	                        }
+	                    });
+	                };
+
 	                sails.log('Building other tables');
-	                processQuery('activity');
-	                processQuery('battery');
-	                processQuery('browseractivity');
-	                processQuery('dns');
-	                processQuery('http');
-	                processQuery('io');
-	                processQuery('ports');
-	                processQuery('procs');
-	                processQuery('sysinfo');
-	                processQuery('wifistats');
+	                insertIntoSessions('activity');
+	                insertIntoSessions('battery');
+	                insertIntoSessions('browseractivity');
+	                // insertIntoSessions('io');
+	                // insertIntoSessions('ports');
+	                // insertIntoSessions('procs');
+	                insertIntoSessions('sysinfo');
+	                insertIntoSessions('wifistats');
+	                insertIntoConnections('dns');
+	                insertIntoConnections('http');
 
 	            });
 
 	            db.close(function(err) {
 	                if (err) return callback("Failed to close sqlite3: " + err);
+
+	                var conn = null;
+	                while(connections.length>0){
+	                	conn= connections.shift();
+	                	sessions[conn.session_key].connections.push(conn);
+	                }
+	                
+	                // ME QUEDE AQUI: AGREGAR VALIDADOR (i.e. sessions.starts <= objects.starts <= subobjects.timestamp <= objects.end <= sessions.end;)
 	                return callback(null,sessions);
 	            });
 
 	        },
 	        function createCompleteSession(sessions,callback){
-	            SQLiteProcessor.createCompleteSession(sessions, file, callback);
+	            // SQLiteProcessor.createCompleteSession(sessions, file, callback);
 	        }
 
 
 	    ],
 	    function(err){
-	        return FileProcessor.endProcess(err,file)
+	    	if(err)sails.log.error(err);
+	        // return FileProcessor.endProcess(err,file)
 	    });
 
 	},
@@ -360,7 +385,7 @@ module.exports = {
     				var act;
     				while(session_o.activity.length > 0){
     					act = session_o.activity.shift();
-    					act.loged_at= new Date(act.timestamp);
+    					act.logged_at= new Date(act.timestamp);
     					act.session_id= sess.id;
     					act.user_name = act.user;
 
@@ -378,7 +403,7 @@ module.exports = {
     				var b;
     				while(session_o.battery.length>0){
     					b = session_o.battery.shift();
-    					b.loged_at = new Date(b.timestamp);
+    					b.logged_at = new Date(b.timestamp);
     					b.session_id= sess.id;
     					delete b.timestamp;
 
@@ -394,7 +419,7 @@ module.exports = {
     				while(session_o.browseractivity.length>0){
     					b = session_o.browseractivity.shift();
 
-    					b.loged_at = new Date(b.timestamp);
+    					b.logged_at = new Date(b.timestamp);
     					b.session_id= sess.id;
     					delete b.timestamp;
 
@@ -410,7 +435,7 @@ module.exports = {
     				while(session_o.dns.length>0){
     					dns = session_o.dns.shift();
 
-    					dns.loged_at = new Date(dns.timestamp);
+    					dns.logged_at = new Date(dns.timestamp);
     					dns.source_ip = dns.srcip
     					dns.destination_ip = dns.destip
     					dns.source_port = dns.srcport
@@ -436,7 +461,7 @@ module.exports = {
     				while(session_o.http.length>0){
     					http = session_o.http.shift();
 
-    					http.loged_at = new Date(http.timestamp);
+    					http.logged_at = new Date(http.timestamp);
     					http.http_verb = http.httpverb;
     					http.http_verb_param = http.httpverbparam
     					http.http_status_code = http.httpstatuscode
@@ -475,7 +500,7 @@ module.exports = {
     				while(session_o.io.length>0){
     					io = session_o.io.shift();
 
-    					io.loged_at = new Date(io.timestamp);
+    					io.logged_at = new Date(io.timestamp);
 
     					io.session_id= sess.id;
 
@@ -493,7 +518,7 @@ module.exports = {
     				while(session_o.ports.length>0){
     					port = session_o.ports.shift();
 
-    					port.loged_at = new Date(port.timestamp);
+    					port.logged_at = new Date(port.timestamp);
     					port.source_ip = port.srcip
     					port.destination_ip = port.destip.length > 0?port.destip:null;
     					port.source_port = port.srcport
@@ -519,7 +544,7 @@ module.exports = {
     				while(session_o.procs.length>0){
     					proc = session_o.procs.shift();
 
-    					proc.loged_at = new Date(proc.timestamp);
+    					proc.logged_at = new Date(proc.timestamp);
 
     					proc.session_id= sess.id;
 
@@ -542,7 +567,7 @@ module.exports = {
     					si.hdd_capacity = si.totalHDD
     					si.serial_number = si.serial
     					si.settings_version = si.version
-    					si.loged_at = new Date(si.timestamp);
+    					si.logged_at = new Date(si.timestamp);
 
     					si.session_id= sess.id;
 
@@ -567,7 +592,7 @@ module.exports = {
 
     					stat.t_speed = stat.tspeed
     					stat.r_speed = stat.rspeed
-    					stat.loged_at = new Date(stat.timestamp);
+    					stat.logged_at = new Date(stat.timestamp);
 
     					stat.session_id= sess.id;
 

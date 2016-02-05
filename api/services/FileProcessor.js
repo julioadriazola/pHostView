@@ -68,7 +68,7 @@ module.exports = {
 
                     upload.unzipped = unzipped;
                     if(unzipped.indexOf(".pcap") > -1){
-                        // FileProcessor.processPCAP(null);
+                        PCAPprocessor.process(upload);
                     }
                     else if(unzipped.indexOf("info") > -1){
                         // FileProcessor.processInfo(null);
