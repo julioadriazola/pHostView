@@ -37,7 +37,7 @@ module.exports = {
 
 	/*
 	 * This function includes transactions. The idea is that one file can be picked
-	 * by only one thread, at the same time that one thrads works with only one file.
+	 * by only one thread, at the same time that one thread works with only one file.
 	 */
 
 	nextFileToProcess: function(nextFunction){
@@ -49,7 +49,7 @@ module.exports = {
 				client.select('*').from('files').where('status','uploaded').limit(1).run,
 
 				function markFileAsProcessing(files,callback){
-					if(files.rows.length == 0) return sails.log.info('Nothing to process');
+					if(files.rows.length == 0) return sails.log.warn('Nothing to process');
 
 					var file= files.rows[0];
 					file.status = 'processing';

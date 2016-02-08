@@ -247,9 +247,9 @@ module.exports = {
 	                insertIntoSessions('activity');
 	                insertIntoSessions('battery');
 	                insertIntoSessions('browseractivity');
-	                // insertIntoSessions('io');
-	                // insertIntoSessions('ports');
-	                // insertIntoSessions('procs');
+	                insertIntoSessions('io');
+	                insertIntoSessions('ports');
+	                insertIntoSessions('procs');
 	                insertIntoSessions('sysinfo');
 	                insertIntoSessions('wifistats');
 	                insertIntoConnections('dns');
@@ -264,22 +264,22 @@ module.exports = {
 	                while(connections.length>0){
 	                	conn= connections.shift();
 	                	sessions[conn.session_key].connections.push(conn);
+	                	delete conn.session_key;
 	                }
-	                
-	                // ME QUEDE AQUI: AGREGAR VALIDADOR (i.e. sessions.starts <= objects.starts <= subobjects.timestamp <= objects.end <= sessions.end;)
+
 	                return callback(null,sessions);
 	            });
 
 	        },
 	        function createCompleteSession(sessions,callback){
-	            // SQLiteProcessor.createCompleteSession(sessions, file, callback);
+	            SQLiteProcessor.createCompleteSession(sessions, file, callback);
 	        }
 
 
 	    ],
 	    function(err){
-	    	if(err)sails.log.error(err);
-	        // return FileProcessor.endProcess(err,file)
+	    	if(err) sails.log.error(err);
+	        return FileProcessor.endProcess(err,file)
 	    });
 
 	},
@@ -303,83 +303,6 @@ module.exports = {
     			 * transform the .db file name attribute into a backend PostgreSQL
     			 * database name attribute, and then it saves de info.
     			 */
-    			function createConnections(sess, callback){
-
-    				var createConnection = function(location_id,connection){
-    					connection.location_id = location_id;
-    					DB.insertOne('connections',connection,function(err,con_c){
-    						if(err){
-    							file.status = 'failed'
-    							file.error_info =  "There's some error inserting connections: " + err
-    							return callback(file.error_info)
-    						}
-    						sails.log.info("Connection inserted with id: " + con_c.id);
-    					});
-    				}
-
-    				var connections=[];
-    				var cwl={}, conn= {}, loc = {};
-    				while(session_o.connections.length>0){
-    					
-    					cwl= session_o.connections.shift(); //connection with location info
-
-
-    					conn.session_id = sess.id; /*Dictionary*/
-    					conn.started_at=new Date(cwl.started_at);
-    					conn.ended_at=new Date(cwl.ended_at);
-    					conn.name = cwl.name
-    					conn.friendly_name = cwl.friendlyname
-    					conn.description = cwl.description
-    					conn.dns_suffix = cwl.dnssuffix
-    					conn.mac = cwl.mac
-    					conn.ips = cwl.ips
-    					conn.gateways = cwl.gateways
-    					conn.dnses = cwl.dnses.trim()
-    					conn.t_speed= cwl.tspeed;
-    					conn.r_speed= cwl.rspeed;
-    					conn.wireless= cwl.wireless;
-    					conn.profile= cwl.profile;
-    					conn.ssid= cwl.ssid;
-    					conn.bssid= cwl.bssid;
-    					conn.bssid_type = cwl.bssidtype;
-    					conn.phy_type = cwl.phytype;
-    					conn.phy_index = cwl.phyindex;
-    					conn.connected = cwl.connected;
-
-    					if(cwl.rdns){ //has location info
-
-    						loc.ip = cwl.ip.trim(); /*Dictionary*/
-    						loc.rdns = cwl.rdns.trim();
-    						loc.asn_number = cwl.asnumber.trim();
-    						loc.asn_name = cwl.asname.trim();
-    						loc.country_code = cwl.countryCode.trim();
-    						loc.city = cwl.city.trim();
-    						loc.latitude = cwl.lat.trim();
-    						loc.longitude = cwl.lon.trim();
-
-    						DB.selectOne('locations',loc, function(err,res){
-    							if(err){
-    								file.status = 'failed'
-    								file.error_info =  "There's some error querying locations: " + err
-    								return callback(file.error_info)
-    							}
-    							if(res.rows.length > 0) createConnection(res.rows[0].id,conn);
-
-    							DB.insertOne('locations',loc,function(err,loc_c){
-    								if(err){
-    									file.status = 'failed'
-    									file.error_info =  "There's some error inserting locations: " + err
-    									return callback(file.error_info)
-    								}
-									createConnection(loc_c.id,conn);
-								});
-    						});
-    					}
-    					else createConnection(null,conn);
-
-    				}
-					return callback(null,sess);
-    			},
     			function createActivities(sess,callback){
     				var activities=[];
     				var act;
@@ -427,71 +350,6 @@ module.exports = {
     				}
 
     				DB.insert('browser_activity',b_acts);
-    				return callback(null,sess);
-    			},
-    			function createDNS(sess,callback){
-    				var dnss=[];
-    				var dns;
-    				while(session_o.dns.length>0){
-    					dns = session_o.dns.shift();
-
-    					dns.logged_at = new Date(dns.timestamp);
-    					dns.source_ip = dns.srcip
-    					dns.destination_ip = dns.destip
-    					dns.source_port = dns.srcport
-    					dns.destination_port = dns.destport
-    					dns.session_id= sess.id;
-
-
-    					delete dns.timestamp;
-    					delete dns.srcip
-    					delete dns.destip
-    					delete dns.srcport
-    					delete dns.destport
-
-    					dnss.push(dns);
-    				}
-
-    				DB.insert('dns_logs',dnss);
-    				return callback(null,sess);
-    			},
-    			function createHTTP(sess,callback){
-    				var https=[];
-    				var http;
-    				while(session_o.http.length>0){
-    					http = session_o.http.shift();
-
-    					http.logged_at = new Date(http.timestamp);
-    					http.http_verb = http.httpverb;
-    					http.http_verb_param = http.httpverbparam
-    					http.http_status_code = http.httpstatuscode
-    					http.http_host = http.httphost
-    					http.content_type = http.contenttype
-    					http.content_length = http.contentlength
-    					http.source_ip = http.srcip
-    					http.destination_ip = http.destip
-    					http.source_port = http.srcport
-    					http.destination_port = http.destport
-
-    					http.session_id= sess.id;
-
-
-    					delete http.httpverb;
-    					delete http.httpverbparam
-    					delete http.httpstatuscode
-    					delete http.httphost
-    					delete http.contenttype
-    					delete http.contentlength
-    					delete http.srcip
-    					delete http.destip
-    					delete http.srcport
-    					delete http.destport
-    					delete http.timestamp
-
-    					https.push(http);
-    				}
-
-    				DB.insert('http_logs',https);
     				return callback(null,sess);
     			},
     			function createIO(sess,callback){
@@ -605,8 +463,159 @@ module.exports = {
 
     				DB.insert('wifi_stats',stats);
     				return callback(null,sess);
-    			}
+    			},
 
+    			function createConnections(sess, callback){
+
+    				var createDNS = function (conn,dns_array){
+
+
+	    				var dnss=[];
+	    				var dns;
+	    				while(dns_array.length>0){
+	    					dns = dns_array.shift();
+
+	    					dns.logged_at = new Date(dns.timestamp);
+	    					dns.source_ip = dns.srcip
+	    					dns.destination_ip = dns.destip
+	    					dns.source_port = dns.srcport
+	    					dns.destination_port = dns.destport
+	    					dns.connection_id= conn.id;
+
+
+	    					delete dns.timestamp;
+	    					delete dns.srcip
+	    					delete dns.destip
+	    					delete dns.srcport
+	    					delete dns.destport
+
+	    					dnss.push(dns);
+	    				}
+
+	    				DB.insert('dns_logs',dnss);
+	    			};
+
+	    			var createHTTP = function(conn,http_array){
+	    				var https=[];
+	    				var http;
+	    				while(http_array.length>0){
+	    					http = http_array.shift();
+
+	    					http.logged_at = new Date(http.timestamp);
+	    					http.http_verb = http.httpverb;
+	    					http.http_verb_param = http.httpverbparam
+	    					http.http_status_code = http.httpstatuscode
+	    					http.http_host = http.httphost
+	    					http.content_type = http.contenttype
+	    					http.content_length = http.contentlength
+	    					http.source_ip = http.srcip
+	    					http.destination_ip = http.destip
+	    					http.source_port = http.srcport
+	    					http.destination_port = http.destport
+
+	    					http.connection_id= conn.id;
+
+
+	    					delete http.httpverb;
+	    					delete http.httpverbparam
+	    					delete http.httpstatuscode
+	    					delete http.httphost
+	    					delete http.contenttype
+	    					delete http.contentlength
+	    					delete http.srcip
+	    					delete http.destip
+	    					delete http.srcport
+	    					delete http.destport
+	    					delete http.timestamp
+
+	    					https.push(http);
+	    				}
+
+	    				DB.insert('http_logs',https);
+	    			}
+
+    				var createConnection = function(location_id,connection,connection_with_location){
+    					
+    					connection.location_id = location_id;
+    					var dns_array = connection_with_location.dns;
+    					var http_array = connection_with_location.http;
+
+    					DB.insertOne('connections',connection,function(err,con_c){
+    						if(err){
+    							file.status = 'failed'
+    							file.error_info =  "There's some error inserting connections: " + err
+    							return callback(file.error_info)
+    						}
+    						sails.log.info("Connection inserted with id: " + con_c.id);
+
+    						createDNS(con_c,dns_array);
+    						createHTTP(con_c,http_array);
+    					});
+    				}
+
+    				var connections=[];
+    				var cwl={}, conn= {}, loc = {};
+    				while(session_o.connections.length>0){
+    					
+    					cwl= session_o.connections.shift(); //connection with location info
+
+
+    					conn.session_id = sess.id; /*Dictionary*/
+    					conn.started_at=new Date(cwl.started_at);
+    					conn.ended_at=new Date(cwl.ended_at);
+    					conn.name = cwl.name
+    					conn.friendly_name = cwl.friendlyname
+    					conn.description = cwl.description
+    					conn.dns_suffix = cwl.dnssuffix
+    					conn.mac = cwl.mac
+    					conn.ips = cwl.ips.split(",");
+    					conn.gateways = cwl.gateways.split(",");
+    					conn.dnses = cwl.dnses.trim().split(",");
+    					conn.t_speed= cwl.tspeed;
+    					conn.r_speed= cwl.rspeed;
+    					conn.wireless= cwl.wireless;
+    					conn.profile= cwl.profile;
+    					conn.ssid= cwl.ssid;
+    					conn.bssid= cwl.bssid;
+    					conn.bssid_type = cwl.bssidtype;
+    					conn.phy_type = cwl.phytype;
+    					conn.phy_index = cwl.phyindex;
+    					conn.connected = cwl.connected;
+
+    					if(cwl.rdns){ //has location info
+
+    						loc.public_ip = cwl.ip.trim(); /*Dictionary*/
+    						loc.reverse_dns = cwl.rdns.trim();
+    						loc.asn_number = cwl.asnumber.trim();
+    						loc.asn_name = cwl.asname.trim();
+    						loc.country_code = cwl.countryCode.trim();
+    						loc.city = cwl.city.trim();
+    						loc.latitude = cwl.lat.trim();
+    						loc.longitude = cwl.lon.trim();
+
+    						DB.selectOne('locations',loc, function(err,res){
+    							if(err){
+    								file.status = 'failed'
+    								file.error_info =  "There's some error querying locations: " + err
+    								return callback(file.error_info)
+    							}
+    							if(res.rows.length > 0) createConnection(res.rows[0].id,conn,cwl);
+
+    							DB.insertOne('locations',loc,function(err,loc_c){
+    								if(err){
+    									file.status = 'failed'
+    									file.error_info =  "There's some error inserting locations: " + err
+    									return callback(file.error_info)
+    								}
+									createConnection(loc_c.id,conn,cwl);
+								});
+    						});
+    					}
+    					else createConnection(null,conn,cwl);
+
+    				}
+					return callback(null,sess);
+    			},
 
     		],
     		function(err){
