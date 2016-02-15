@@ -77,7 +77,7 @@ module.exports = {
 	                        session = result;
 	                        session.connections = [];
 	                        session.activity = [];
-	                        session.battery = [];
+	                        session.powerstates = [];
 	                        session.browseractivity = [];
 	                        session.io = [];
 	                        session.ports = [];
@@ -192,7 +192,7 @@ module.exports = {
 
 
 	                /*
-	                 * The processQuery assumes that both, into and from tables (from: battery, activities,etc.)
+	                 * The processQuery assumes that both, into and from tables (from: powerstates, activities,etc.)
 	                 * are ordered by timestamp.
 	                 * This function basically adds de table elements to his respective into object.
 	                 */
@@ -245,7 +245,7 @@ module.exports = {
 
 	                sails.log('Building other tables');
 	                insertIntoSessions('activity');
-	                insertIntoSessions('battery');
+	                insertIntoSessions('powerstates');
 	                insertIntoSessions('browseractivity');
 	                insertIntoSessions('io');
 	                insertIntoSessions('ports');
@@ -324,8 +324,8 @@ module.exports = {
     			function createBatteryLogs(sess,callback){
     				var battery_logs=[];
     				var b;
-    				while(session_o.battery.length>0){
-    					b = session_o.battery.shift();
+    				while(session_o.powerstates.length>0){
+    					b = session_o.powerstates.shift();
     					b.logged_at = new Date(b.timestamp);
     					b.session_id= sess.id;
     					delete b.timestamp;

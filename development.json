@@ -1,6 +1,6 @@
 { // this is an example -- update values before use !!
   "apps" : [{ 
-    "name"              : "pHV-dev",
+    "name"              : "hvfp",
     "script"            : "app.js",
     "instances"         : "3",
     "run_as_user"       : "julio",

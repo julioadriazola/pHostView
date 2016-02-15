@@ -17,7 +17,7 @@ module.exports = {
     },
 
     decompressZIP: function(upload){
-        var ofn = process.cwd() + upload.file_path; //Original file name
+        var ofn = upload.file_path; //Original file name
         var fn = ofn;
 
         /*
@@ -92,21 +92,7 @@ module.exports = {
 
     endProcess: function(err,file){
         /*
-         * List of status:
-         * errored: means that the file has an unappropiated format or doesn't contains information.
-         *
-         * waitingFile: means that there was a problem with the zipped file (it doesn't exists, 
-         * it's being used for another process, it's not possible to find file inside [the unzipped one],
-         * etc.). Files with this status can be processed later.
-         *
-         * failed: means that there was a problem processing the unzipped file, for example, a database problem,
-         * that means there's no format problem apparently.
-         *
-         * processed: means that the file was processed succesfully without problems.
-         *
-         * processing: means that the file is being processed. It can't be processed for more than one thread.
-         * If there is some file with an "eternal" processing status, it means that some problem
-         * arised and was not catched.
+         * See more details about status on ./README.md
          */
 
         if(file.status == 'waitingFile' || file.status == 'failed' ){
