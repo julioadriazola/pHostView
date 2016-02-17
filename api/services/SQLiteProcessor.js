@@ -77,7 +77,7 @@ module.exports = {
 	                        session = result;
 	                        session.connections = [];
 	                        session.activity = [];
-	                        session.powerstates = [];
+	                        session.powerstate = [];
 	                        session.browseractivity = [];
 	                        session.io = [];
 	                        session.ports = [];
@@ -97,8 +97,8 @@ module.exports = {
 
 	               q=`Select 
 							a.*,
-							l.ip,
-							l.rdns,
+							l.public_ip,
+							l.reverse_dns,
 							l.asnumber,
 							l.asname,
 							l.countryCode,
@@ -192,7 +192,7 @@ module.exports = {
 
 
 	                /*
-	                 * The processQuery assumes that both, into and from tables (from: powerstates, activities,etc.)
+	                 * The processQuery assumes that both, into and from tables (from: powerstate, activities,etc.)
 	                 * are ordered by timestamp.
 	                 * This function basically adds de table elements to his respective into object.
 	                 */
@@ -245,7 +245,7 @@ module.exports = {
 
 	                sails.log('Building other tables');
 	                insertIntoSessions('activity');
-	                insertIntoSessions('powerstates');
+	                insertIntoSessions('powerstate');
 	                insertIntoSessions('browseractivity');
 	                insertIntoSessions('io');
 	                insertIntoSessions('ports');
@@ -324,8 +324,8 @@ module.exports = {
     			function createBatteryLogs(sess,callback){
     				var battery_logs=[];
     				var b;
-    				while(session_o.powerstates.length>0){
-    					b = session_o.powerstates.shift();
+    				while(session_o.powerstate.length>0){
+    					b = session_o.powerstate.shift();
     					b.logged_at = new Date(b.timestamp);
     					b.session_id= sess.id;
     					delete b.timestamp;
@@ -333,7 +333,7 @@ module.exports = {
     					battery_logs.push(b);
     				}
 
-    				DB.insert('battery_logs',battery_logs);
+    				DB.insert('power_states',battery_logs);
     				return callback(null,sess);
     			},
     			function createBrowserActivity(sess,callback){
@@ -424,7 +424,6 @@ module.exports = {
     					si.memory_installed = si.totalRAM
     					si.hdd_capacity = si.totalHDD
     					si.serial_number = si.serial
-    					si.settings_version = si.version
     					si.logged_at = new Date(si.timestamp);
 
     					si.session_id= sess.id;
@@ -433,7 +432,6 @@ module.exports = {
     					delete si.totalRAM
     					delete si.totalHDD
     					delete si.serial
-    					delete si.version
     					delete si.timestamp
 
     					infos.push(si);
@@ -488,6 +486,7 @@ module.exports = {
 	    					delete dns.destip
 	    					delete dns.srcport
 	    					delete dns.destport
+	    					delete dns.connstart		//REVIEW THIS: It could be useful.
 
 	    					dnss.push(dns);
 	    				}
@@ -584,8 +583,8 @@ module.exports = {
 
     					if(cwl.rdns){ //has location info
 
-    						loc.public_ip = cwl.ip.trim(); /*Dictionary*/
-    						loc.reverse_dns = cwl.rdns.trim();
+    						loc.public_ip = cwl.public_ip.trim(); /*Dictionary*/
+    						loc.reverse_dns = cwl.reverse_dns.trim();
     						loc.asn_number = cwl.asnumber.trim();
     						loc.asn_name = cwl.asname.trim();
     						loc.country_code = cwl.countryCode.trim();
@@ -593,6 +592,16 @@ module.exports = {
     						loc.latitude = cwl.lat.trim();
     						loc.longitude = cwl.lon.trim();
 
+    						DB.createOneIfNotExist('locations',loc,function(err,loc_c){
+    							if(err){
+    								file.status = 'failed'
+    								file.error_info =  "There's some error querying/inserting locations: " + err
+    								return callback(file.error_info)
+    							}
+
+    							createConnection(loc_c.id,conn,cwl)
+    						});
+/*
     						DB.selectOne('locations',loc, function(err,res){
     							if(err){
     								file.status = 'failed'
@@ -609,7 +618,7 @@ module.exports = {
     								}
 									createConnection(loc_c.id,conn,cwl);
 								});
-    						});
+    						});*/
     					}
     					else createConnection(null,conn,cwl);
 

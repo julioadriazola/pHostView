@@ -38,6 +38,7 @@ module.exports = {
 	/*
 	 * This function includes transactions. The idea is that one file can be picked
 	 * by only one thread, at the same time that one thread works with only one file.
+	 * Picks every type of file excepto SQLite.
 	 */
 
 	nextFileToProcess: function(nextFunction){
@@ -46,10 +47,44 @@ module.exports = {
 		pgsql.transaction(function(client,callback){
 			async.waterfall([
 
-				client.select('*').from('files').where('status','uploaded').limit(1).run,
+				client.select('*').from('files').where(pgsql.sql.and({'status': 'uploaded'},pgsql.sql.not(pgsql.sql.like('basename','%stats.db%')))).limit(1).run,
 
 				function markFileAsProcessing(files,callback){
 					if(files.rows.length == 0) return sails.log.warn('Nothing to process');
+					sails.log(files.rows[0].file_path)
+
+					var file= files.rows[0];
+					file.status = 'processing';
+					file.updated_at=new Date();
+
+					client.update('files', file).where('id',file.id).run(function(err){
+						if(err) return callback(err);
+						callback(null,file);
+					});
+				}
+			],
+			callback);
+		}, nextFunction)
+	},
+
+	/*
+	 * This function includes transactions. The idea is that one file can be picked
+	 * by only one thread, at the same time that one thread works with only one file.
+	 * Picks only SQLite files.
+	 */
+
+	nextSQLiteFileToProcess: function(nextFunction){
+		if(!pgsql) DB.start();
+
+		pgsql.transaction(function(client,callback){
+			async.waterfall([
+
+				client.select('*').from('files').where(pgsql.sql.and({'status':'uploaded'},pgsql.sql.like('basename','%stats.db%'))).limit(1).run,
+					// "status = 'uploaded' AND file_path LIKE '%stats.db%'"
+
+				function markFileAsProcessing(files,callback){
+					if(files.rows.length == 0) return sails.log.warn('Nothing to process');
+					sails.log(files.rows[0].file_path)
 
 					var file= files.rows[0];
 					file.status = 'processing';
@@ -95,19 +130,125 @@ module.exports = {
 	    }
     },
 
+    /*
+     * Insert one value in a table and return the row object created.
+     * A third parameter is passed so when you execute createOneIfNotExist
+     * you can know if it's a new row or an existing one.
+     */
     insertOne: function(table,value,nextFunction){
     	if(!pgsql) DB.start();
-
-    	if(value) pgsql.insert(table,value).returning('*').row(nextFunction);
+    	if(value) pgsql.insert(table,value).returning('*').row(function(err,row){
+    		nextFunction(err,row,true);
+    	});
     	else sails.log.error("Nothing to insert into " + table);
     },
 
+    /*
+     * Simple select for unique stuffs like id.
+     * It will return the first row that matches the value object.
+     * The value object must be a valid object for pg-bricks where method. 
+     */
     selectOne: function(table,value,nextFunction){
     	if(!pgsql) DB.start();
 
-    	pgsql.select('*').from(table).where(value).limit(1).run(nextFunction);
+    	pgsql.select('*').from(table).where(value).limit(1).run(function(err,query_result){
+    		if(query_result && query_result.rows.length == 1) nextFunction(err,query_result.rows[0]);
+    		else nextFunction(err);
+    	});
+    },
+
+    select: function(table,value,nextFunction){
+    	if(!pgsql) DB.start();
+
+    	pgsql.select('*').from(table).where(value).run(nextFunction);
+    },
+
+    /*
+     * Select all the parts of a pcap from the basename of one part.
+     */
+    selectPCAPParts: function(file,nextFunction){
+    	if(!pgsql) DB.start();
+    	//It will work only with the basename, i.e. the part that cames after the last '/'
+    	// 0                1                   2         3
+    	// sessiontimestamp_connectiontimestamp_timestamp_deviceguid.pcap       --> pcap
+    	// sessiontimestamp_connectiontimestamp and deviceguid will be constant for related pcap parts
+    	var base = file.basename.split('_').slice(0,2).join('_')
+    	pgsql.select('*').from('files').where(pgsql.sql.and({'device_id': file.device_id},pgsql.sql.like('basename','%'+base+'%'))).order('basename ASC').run(nextFunction)
+    },
+
+    /*
+     * Must be inserted All or nothing.
+     */
+    createCompletePCAP: function(parts,connection,nextFunction){
+
+    	var pcap = {
+    		connection_id: 	connection.id,
+    		status: 		'uploaded',
+    	}
+
+    	pgsql.transaction(function(client,callback){
+    		async.waterfall([
+
+    			client.insert('pcap',pcap).returning('*').row,
+
+    			function addFilesToPCAP(pcap,callback){
+    				if(!pcap) return callback("There's some problem inserting values to pcap table");
+
+    				sails.log.info('PCAP inserted with id: ' + pcap.id)
+
+    				var inserts= []
+    				var insert = {}
+    				for(var i = 0; i < parts.length; i++){
+    					insert = {}
+    					insert.pcap_id = pcap.id;
+    					insert.file_id = parts[i].id;
+    					insert.file_order = i+1;
+
+    					sails.log(insert.pcap_id + ',' + insert.file_id + ',' + insert.file_order)
+
+    					inserts.push(insert);
+    				}
+
+					client.insert('pcap_file',inserts).returning('*').rows(callback)
+    			},
+
+    			function markFilesAsProcessed(pcap_files,callback){
+    				if(!pcap_files) return callback("There's some problem inserting values to pcap_file table");
+
+    				sails.log.info('Rows inserted in table pcap_file: ' + pcap_files.length)
+
+    				var fileIds = [];
+    				for(var i = 0; i < pcap_files.length; i++){
+    					fileIds.push(pcap_files[i].file_id);
+    				}
+
+    				client.update('files',{status: 'processed',updated_at: new Date()}).where(pgsql.sql.in('id',fileIds)).run(callback)
+    			}
+    		],
+    		callback);
+    	}, nextFunction)
     },
 
 
+    /*
+     * Find if a sepecific value exists in the table specified. If not, it will be created.
+     * Then, return that value.
+     * A third argument is passed (true) if the result is a new row.
+     */
+    createOneIfNotExist: function(table,value,nextFunction){
+    	DB.selectOne(table,value,function(err,result){
+    		if(err) nextFunction(err);
+    		else if(result) nextFunction(err,result);
+			else DB.insertOne(table,value,nextFunction);
+    	});
+    },
+
+    existsObject: function(table,value,nextFunction){
+    	DB.selectOne(table,value,function(err,el){
+    		if(err) nextFunction(err);
+    		else if(result) nextFunction(err,result)
+    		else (err,null)
+    	});
+    }
 
 }

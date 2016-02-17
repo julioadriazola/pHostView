@@ -24,13 +24,21 @@ The important fields are:
 		Contains the absolute path to the raw file, that it's a zipped file.
 	
 
-	status: Can be uploaded|processing|waitingFile|failed|errored|skipped|processed
+	status: Can be uploaded|processing|typeNotfound|waitingParent|waitingFile|failed|errored|skipped|processed
 
 
 		uploaded: The file was uploaded and it's ready to be processed.
 
 		processing:	For concurrency, to guarantee that the file is processed only once.
 		It's important to check that the files always pass from this status to another one.
+
+		typeNotfound: The file name isn't valid so it's not possible to determine what kind 
+		of file is and how to process it.
+
+		waitingParent: The corresponding session or connection (It's taken from the file 
+		name, i.e. "123456789_..." corresponds to a session with start timestamp = 123456789,
+		and it's similar in the case of connections) doesn't exist yet, so it's necessary
+		to wait for him before process the file.		
 
 		waitingFile: The file is not synchronized yet to UCN server, or there's some problem
 		not associated with the content of the file, but the file itself (File doesn't exist or
@@ -43,9 +51,10 @@ The important fields are:
 		entity or attribute missing, or a malformed json. In this case the file will
 		never be processed again.
 
-		skipped: For the moment, it's only used for PCAP files. We want to process the PCAP file 
-		only once, so the _parts_ are skipped from processing, and we can try to process the whole 
-		file once we have the last one, so only the _last part_ is marked as uploaded.
+		skipped: It's used only in two cases. First, when we don't want to process something, like
+		the log files. And second, we want to process the PCAP file only once, so the _parts_ are 
+		skipped from processing, and we can try to process the whole file once we have the last one, 
+		so only the _last part_ is marked as uploaded.
 
 		processed: The file was processed without errors. In the case of pcap files it means that
 		the pcap table was filled with a new row and the it's ready to be processed.
@@ -89,19 +98,28 @@ exists the same difference mentioned for the _sessions_ table.
 
 ### pcap ###
 
-It represents an entire processable pcap file. The main attribute is the files_id[] array, that
-
-contains an ordered array of raw parts of pcap files. This pcap object must be created only once
+It represents an entire processable pcap file. This pcap object must be created only once
 
 all the parts of the pcap file were uploaded.
 
-The important fields are:
+The important field is:
 
-	files_id[]: An array with ordered raw parts of pcap files.
 
 	status: Can be uploaded|processing|failed|errored|processed, and they represent the same as
 
 	in the _files_ table, but for the whole pcap file.
+
+	pcap_file.file_id[]: It's explained below.
+
+
+
+### pcap_file ###
+
+It's not possible in PostgreSQL to create an array with foreign key constraint, so, it's necessary
+
+this table to create the association between files and pcap object. All the ordered files of a
+
+pcap_id represent the raw parts of it, which must be 'joined' before execute the tcptrace script.
 
 
 

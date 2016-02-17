@@ -5,19 +5,108 @@ var child_process = require('child_process'),
 
 module.exports = {
 
+    /*
+     * 1 - Synchronize files
+     * 2 - Process SQLite
+     * 3 - Synchronize files again
+     * 4 - Process rest of the files
+     * 5 - Process complete PCAP files
+     */
 
-    processOneFile: function(){
-        /*
-         * processOneFile will be called again by endProcess function
-         */
-        DB.nextFileToProcess(function(err,file){
+    processOneSQLiteFile: function(){
+        DB.nextSQLiteFileToProcess(function(err,file){
             if(err) return sails.log.error("There's some error: " + err);
-            FileProcessor.decompressZIP(file);
+            FileProcessor.nextIfParentExists(file);
+            // FileProcessor.decompressZIP(file);
         });
     },
 
+
+    processOneFile: function(){
+        DB.nextFileToProcess(function(err,file){
+            if(err) return sails.log.error("There's some error: " + err);
+            if(FileProcessor.getType(file.basename) == 'pcap') PCAP.process(file,{id: 1234});
+            // FileProcessor.nextIfParentExists(file);
+            // FileProcessor.decompressZIP(file);
+        });
+    },
+
+    /*
+     * It gives the file type starting from the file name. This is the list of 
+     * valid processable files.
+     */
+    getType: function(fn){
+        if(fn.indexOf("_stats.db") > -1)                    return 'sqlite'
+        else if(fn.indexOf("_last.pcap") > -1)              return 'pcap'
+        // else if(fn.indexOf("_questionnaire.json") > -1)     return 'survey'
+        //json could be pageload or video. It's necessary to see the content to determine it.
+        // else if(fn.indexOf(".json") > -1)                   return 'json' 
+        else return null
+
+    },
+
+    
+    /*
+     * It determines wether or not the session/connection exists.
+     * In the case of sqlite files it's not necessary.
+     */
+    nextIfParentExists: function(file){
+        var fileType = FileProcessor.getType(file.basename);
+        var table = '';
+        var find = {};
+
+
+
+        if(['sqlite'].indexOf(fileType) > -1) return FileProcessor.decompressZIP(file);
+        else if(['survey','json'].indexOf(fileType) > -1){
+            table = 'sessions';
+            // 0                1           2
+            // sessiontimestamp_timestamp_browserupload.json                        --> json (video or pageupload)
+            // sessiontimestamp_somenumber_questionnaire.json                       --> survey
+            find.started_at= new Date(parseInt(file.basename.split('_')[0]));
+        }
+        else if(['pcap'].indexOf(fileType) > -1){
+            table = 'connections'
+            // 0                1                   2         3
+            // sessiontimestamp_connectiontimestamp_timestamp_deviceguid.pcap       --> pcap
+            find.started_at= new Date(parseInt(file.basename.split('_')[1]));
+        }
+        else{
+            file.status = 'typeNotfound'
+            file.error_info = "It's impossible to determine the " + file.basename + " file type"
+            return FileProcessor.endProcess(null,file);
+        }
+
+        DB.selectOne(table,find,function(err,result){
+            if(err){
+                file.status = 'failed'
+                file.error_info = "There's some error querying the table " + table;
+                return FileProcessor.endProcess(err,file);
+            }
+
+            //Session/Connection founded, so process the file.
+            if(result) {
+
+                /*
+                 * PCAP are processed separately because in this step we don't
+                 * want to decompress the file yet, only 'put parts together',
+                 * that means, fill 'pcap' and 'pcap_files' tables.
+                 */
+                if(['pcap'].indexOf(fileType) > -1) return PCAP.process(file,result);
+                return FileProcessor.decompressZIP(file,result);
+            }
+            else{
+                file.status = 'waitingParent'
+                return FileProcessor.endProcess(null,file);
+            }
+
+        });
+    },
+
+    
+
     decompressZIP: function(upload){
-        var ofn = upload.file_path; //Original file name
+        var ofn = upload.folder + '/' + upload.basename; //Original file name
         var fn = ofn;
 
         /*
@@ -67,22 +156,21 @@ module.exports = {
                     }
 
                     upload.unzipped = unzipped;
-                    if(unzipped.indexOf(".pcap") > -1){
+                    if(FileProcessor.getType(upload.basename) == 'pcap'){
                         PCAPprocessor.process(upload);
                     }
-                    else if(unzipped.indexOf("info") > -1){
-                        // FileProcessor.processInfo(null);
+                    else if(FileProcessor.getType(upload.basename) == 'survey'){
+                        SurveyProcessor.process(upload);  
                     }
-                    else if(unzipped.indexOf(".db") > -1){
-                        
+                    else if(FileProcessor.getType(upload.basename) == 'sqlite'){
                         SQLiteProcessor.process(upload);
                     }
-                    else if(unzipped.indexOf(".log") > -1){
-                        
-                        // FileProcessor.processDB(upload);
+                    else if(FileProcessor.getType(upload.basename) == 'json'){
+                        //TODO: write json processor
+                        FileProcessor.endProcess(upload);
                     }
                     else{
-                        SurveyProcessor.process(upload);  
+                        FileProcessor.endProcess(upload);
                     }
 
                 }
@@ -95,9 +183,10 @@ module.exports = {
          * See more details about status on ./README.md
          */
 
-        if(file.status == 'waitingFile' || file.status == 'failed' ){
+        if(['waitingFile','waitingParent','failed','typeNotfound'].indexOf(file.status) > -1 ){
             sails.log.warn("File with id: " + file.id + " was marked as "+ file.status+".");
             if(file.error_info) sails.log.warn(file.error_info)
+            if(err) sails.log.error(err);
         }
         else if(err) {
             file.status = "errored";
@@ -119,7 +208,7 @@ module.exports = {
             delete file.tmp_folder;
         }
 
-        delete file.unzipped;
+        if(file.unzipped) delete file.unzipped;
         
         DB.updateFile(file,function(err){
             if(err) return sails.log.error('It was Impossible to mark file with id: ' + file.id + ' as ' + file.status);
@@ -128,7 +217,8 @@ module.exports = {
              * If it's not possible to mark the file with the status, then no more files will be processed by this thread.
              * (Instead the function will be called again, obviously)
              */
-            FileProcessor.processOneFile();
+            // if(FileProcessor.getType(file.file_path) == 'sqlite') FileProcessor.processOneSQLiteFile();
+            // else FileProcessor.processOneFile();
 
         });
     },
