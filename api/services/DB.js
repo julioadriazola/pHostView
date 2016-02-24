@@ -51,7 +51,7 @@ module.exports = {
 
 				function markFileAsProcessing(files,callback){
 					if(files.rows.length == 0) return sails.log.warn('Nothing to process');
-					sails.log(files.rows[0].file_path)
+					sails.log(files.rows[0].basename)
 
 					var file= files.rows[0];
 					file.status = 'processing';
@@ -84,7 +84,7 @@ module.exports = {
 
 				function markFileAsProcessing(files,callback){
 					if(files.rows.length == 0) return sails.log.warn('Nothing to process');
-					sails.log(files.rows[0].file_path)
+					sails.log(files.rows[0].basename)
 
 					var file= files.rows[0];
 					file.status = 'processing';
@@ -168,12 +168,17 @@ module.exports = {
      */
     selectPCAPParts: function(file,nextFunction){
     	if(!pgsql) DB.start();
-    	//It will work only with the basename, i.e. the part that cames after the last '/'
-    	// 0                1                   2         3
-    	// sessiontimestamp_connectiontimestamp_timestamp_deviceguid.pcap       --> pcap
-    	// sessiontimestamp_connectiontimestamp and deviceguid will be constant for related pcap parts
-    	var base = file.basename.split('_').slice(0,2).join('_')
-    	pgsql.select('*').from('files').where(pgsql.sql.and({'device_id': file.device_id},pgsql.sql.like('basename','%'+base+'%'))).order('basename ASC').run(nextFunction)
+
+        // 0             1             2  3                                    4
+        // session       connection    #  interface_id                         sufix   
+        // 1456320420964_1456320421042_10_A2692622-D935-45DD-BC6A-0FEA4F88524C_part.pcap.zip
+        var sb = file.basename.split('_')
+    	var base = '%' + sb[0] + '_' + sb[1] + '_%_' + sb[3] + '%' 
+    	pgsql.select('*')
+            .from('files')
+            .where(pgsql.sql.and({'device_id': file.device_id},pgsql.sql.like('basename',base)))
+            .order("cast(split_part(basename,'_',3) as integer) ASC")
+            .run(nextFunction)
     },
 
     /*

@@ -16,14 +16,15 @@ module.exports = {
 				return FileProcessor.endProcess(null,file);
 			}
 
-			sails.log.info('PCAP PARTS:');
-			sails.log.info(result.rows);
+			// Last par will see as follow:
+			// 1456319539491_1456319542873_4_A2692622-D935-45DD-BC6A-0FEA4F88524C_last.pcap.zip
+			// The third 'argument' will give us the position of this part starting from 0.
+			// So, from the last part we can obtain the total number of parts.
 
-			// var numberOfParts= parseInt(file.basename.split('_')[2]);				//TODO: It must work in the new version that has the part number instead of timestamp
+			var numberOfParts= parseInt(file.basename.split('_')[2]) + 1;
 
-			if(true || numberOfParts == result.rows.length){ //Parts must be in order	//TODO: Delete 'true ||'
-
-				var parts = [ {id: 1}, {id: 100}, {id: 2}, {id: 101}, {id: 7}] 			//TODO: Replace it by result.rows
+			if(numberOfParts == result.rows.length){
+				var parts = result.rows;
 
 				DB.createCompletePCAP(parts,connection,function(err){
 					if(err){

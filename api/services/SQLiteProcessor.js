@@ -105,7 +105,7 @@ module.exports = {
 							l.city,
 							l.lat,
 							l.lon,
-							l.timestamp l_timestamp,
+							l.connstart l_timestamp,
 							a.timestamp started_at,
 							MIN(b.timestamp) ended_at 
 						FROM connectivity a
@@ -114,7 +114,7 @@ module.exports = {
 							AND b.connected = 0
 							AND a.timestamp <= b.timestamp
 						LEFT JOIN location l 
-							ON a.timestamp = l.timestamp
+							ON a.timestamp = l.connstart
 						WHERE a.connected = 1
 						GROUP BY a.timestamp
 						ORDER BY a.mac ASC, started_at ASC, ended_at ASC`;

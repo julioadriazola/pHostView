@@ -25,8 +25,8 @@ module.exports = {
     processOneFile: function(){
         DB.nextFileToProcess(function(err,file){
             if(err) return sails.log.error("There's some error: " + err);
-            if(FileProcessor.getType(file.basename) == 'pcap') PCAP.process(file,{id: 1234});
-            // FileProcessor.nextIfParentExists(file);
+            // if(FileProcessor.getType(file.basename) == 'pcap') PCAP.process(file,{id: 1234});
+            FileProcessor.nextIfParentExists(file);
             // FileProcessor.decompressZIP(file);
         });
     },
@@ -59,16 +59,18 @@ module.exports = {
 
         if(['sqlite'].indexOf(fileType) > -1) return FileProcessor.decompressZIP(file);
         else if(['survey','json'].indexOf(fileType) > -1){
-            table = 'sessions';
-            // 0                1           2
+            // 0                1         2
             // sessiontimestamp_timestamp_browserupload.json                        --> json (video or pageupload)
             // sessiontimestamp_somenumber_questionnaire.json                       --> survey
+            table = 'sessions';
             find.started_at= new Date(parseInt(file.basename.split('_')[0]));
         }
         else if(['pcap'].indexOf(fileType) > -1){
+            // 0             1             2  3                                    4
+            // session       connection    #  interface_id                         sufix   
+            // 1456320420964_1456320421042_10_A2692622-D935-45DD-BC6A-0FEA4F88524C_part.pcap.zip
+
             table = 'connections'
-            // 0                1                   2         3
-            // sessiontimestamp_connectiontimestamp_timestamp_deviceguid.pcap       --> pcap
             find.started_at= new Date(parseInt(file.basename.split('_')[1]));
         }
         else{
