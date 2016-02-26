@@ -5,19 +5,10 @@ var child_process = require('child_process'),
 
 module.exports = {
 
-    /*
-     * 1 - Synchronize files
-     * 2 - Process SQLite
-     * 3 - Synchronize files again
-     * 4 - Process rest of the files
-     * 5 - Process complete PCAP files
-     */
-
     processOneSQLiteFile: function(){
         DB.nextSQLiteFileToProcess(function(err,file){
             if(err) return sails.log.error("There's some error: " + err);
             FileProcessor.nextIfParentExists(file);
-            // FileProcessor.decompressZIP(file);
         });
     },
 
@@ -25,9 +16,7 @@ module.exports = {
     processOneFile: function(){
         DB.nextFileToProcess(function(err,file){
             if(err) return sails.log.error("There's some error: " + err);
-            // if(FileProcessor.getType(file.basename) == 'pcap') PCAP.process(file,{id: 1234});
             FileProcessor.nextIfParentExists(file);
-            // FileProcessor.decompressZIP(file);
         });
     },
 
@@ -219,8 +208,8 @@ module.exports = {
              * If it's not possible to mark the file with the status, then no more files will be processed by this thread.
              * (Instead the function will be called again, obviously)
              */
-            // if(FileProcessor.getType(file.file_path) == 'sqlite') FileProcessor.processOneSQLiteFile();
-            // else FileProcessor.processOneFile();
+            if(FileProcessor.getType(file.basename) == 'sqlite') FileProcessor.processOneSQLiteFile();
+            else FileProcessor.processOneFile();
 
         });
     },

@@ -41,13 +41,12 @@ module.exports.blueprints = { actions: false, rest: false, shortcuts: false };
 module.exports.models= { migrate: 'safe'} ;
 module.exports.policies = { '*' : false }; //No access to any resource.
 
-module.exports.connections = { //All-access-granted connection
-  postgreSQLDatabase: {
-   adapter: 'sails-postgresql',
-   host: 'localhost',
-   user: 'julio',
-   password: '123123123',
-   database: 'test',
-   port: 5432
-  },
- }
+module.exports.connections = { //User can CRUD over devices, and can write into files table.
+ postgreSQLDatabase: {
+  host: (process.env.PROD_DATABASE_SERVER || ''),
+  user: (process.env.PROD_DATABASE_USER||''),
+  password: (process.env.PROD_DATABASE_PASSWORD||''),
+  database: (process.env.PROD_DATABASE_NAME||''),
+  port: (process.env.PROD_DATABASE_PORT||'')
+ },
+}
