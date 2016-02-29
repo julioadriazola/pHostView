@@ -96,7 +96,7 @@ module.exports = {
 
     
 
-    decompressZIP: function(upload, parent = null){
+    decompressZIP: function(upload, parent){
         var ofn = upload.folder + '/' + upload.basename; //Original file name
         var fn = ofn;
 
@@ -210,6 +210,17 @@ module.exports = {
 
         });
     },
+
+    synchronizeFiles: function (){
+        // cmd = "rsync -a --remove-source-files /home/jadriazo/hostviewupload/data jadriazo@ucn.inria.fr:/home/jadriazo/hostviewupload && rm -rf /home/jadriazo/hostviewupload/data/*";
+        
+        cmd = "/usr/bin/rsync -a --remove-source-files " + sails.config.rsync.from + " " + sails.config.rsync.to + " && rm -rf " + sails.config.rsync.from + "/*"
+        child_process.exec(cmd,function(err,stdout,stderr){
+            if(err) sails.log.error(err);
+            sails.log(stdout);
+            sails.log(stderr);
+        })
+    }
 
 
 
