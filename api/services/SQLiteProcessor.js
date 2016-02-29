@@ -236,6 +236,7 @@ module.exports = {
 	},
 
     createCompleteSession: function(session,file,cb){
+    	if(session)
 		async.waterfall([
 			function createSession(callback){
 				var sess = {};
