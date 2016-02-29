@@ -46,6 +46,116 @@ fi
 * In python you can use the variables with `os.environ.get("VARIABLE_NAME")` (It's necessary to import os before)
 
 
+#Cronjobs
+
+For the main purpose of processing, it's necessary to add some cronjobs to the schedule. The next task must be added to the muse crontab:
+
+```bash
+#(At **:10) sync files between muse and ucn servers
+10 * * * * rsync -a --remove-source-files /home/jadriazo/hostviewupload/data jadriazo@ucn.inria.fr:/home/jadriazo/hostviewupload && rm -rf /home/jadriazo/hostviewupload/data/*
+```
+
+And the next tasks to the ucn crontab:
+```bash
+#For production
+25 5 * * * cd /home/jadriazo/pcapProcessing; python -c "import os; os.environ['RUNNING_ENV'] = 'PROD'; import helper; helper.Helper.resetPcap()"
+30 5 * * * cd /home/jadriazo/pcapProcessing; python -c "import os; os.environ['RUNNING_ENV'] = 'PROD'; import helper; helper.Helper.processNextPcap()"
+
+#Note that for do the same in development it's only necessary to change the PROD value by DEV
+```
+
+Finally, `sails-hook-schedule` must be installed for the Process Files application, and this 3 task must be added to the config/schedule.js:
+```javascript
+#<dir to process file application>/config/schedule.js
+module.exports.schedule = {
+    sailsInContext : true, //If sails is not as global and you want to have it in your task
+    tasks          : {
+        // /*Every monday at 1am
+         runSQLite : {
+             cron : "15 * * * *",
+             task : function ()
+             {
+                FileProcessor.processOneSQLiteFile();
+             }
+         },
+         resetOtherFiles : {
+             cron : "25 3 * * *",
+             task : function ()
+             {
+                FileProcessor.resetFiles();
+             }
+         },
+         runOtherFiles : {
+             cron : "30 3 * * *",
+             task : function ()
+             {
+                FileProcessor.processOneFile();
+             }
+         },
+
+    }
+};
+
+```
+
+The final Schedule result is the  next:
+
+
+```bash
+00:10   Synchronize files   
+00:15   Process SQLite   
+01:10   Synchronize files   
+01:15   Process SQLite   
+02:10   Synchronize files   
+02:15   Process SQLite   
+03:10   Synchronize files   
+03:15   Process SQLite  
+03:25   RESET FILES
+03:30   PROCESS ONE FILE
+04:10   Synchronize files   
+04:15   Process SQLite   
+05:10   Synchronize files   
+05:15   Process SQLite
+05:25   RESET PCAP
+05:30   PROCESS PCAP (TCPTRACE)
+06:10   Synchronize files   
+06:15   Process SQLite   
+07:10   Synchronize files   
+07:15   Process SQLite   
+08:10   Synchronize files   
+08:15   Process SQLite
+09:10   Synchronize files   
+09:15   Process SQLite   
+10:10   Synchronize files   
+10:15   Process SQLite   
+11:10   Synchronize files   
+11:15   Process SQLite   
+12:10   Synchronize files   
+12:15   Process SQLite   
+13:10   Synchronize files   
+13:15   Process SQLite   
+14:10   Synchronize files   
+14:15   Process SQLite   
+15:10   Synchronize files   
+15:15   Process SQLite   
+16:10   Synchronize files   
+16:15   Process SQLite   
+17:10   Synchronize files   
+17:15   Process SQLite   
+18:10   Synchronize files   
+18:15   Process SQLite   
+19:10   Synchronize files   
+19:15   Process SQLite   
+20:10   Synchronize files   
+20:15   Process SQLite   
+21:10   Synchronize files   
+21:15   Process SQLite   
+22:10   Synchronize files   
+22:15   Process SQLite   
+23:10   Synchronize files   
+23:15   Process SQLite 
+```  
+
 
 # Database Schema
 
