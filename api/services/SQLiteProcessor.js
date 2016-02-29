@@ -154,49 +154,50 @@ module.exports = {
 	                var insertIntoSessions = function(table){
 
 	                    q = "Select * FROM " + table + " ORDER BY timestamp ASC;";
-	                    db.each(q, function(err,result){
-	                        if(err) return callback(err);
-	                        if(!result) return callback('No results executing query: ' + q);
+	                    if(session)
+		                    db.each(q, function(err,result){
+		                        if(err) return callback(err);
+		                        if(!result) return callback('No results executing query: ' + q);
 
-	                        // Maybe we can suppose that this always be true and remove the if/else and only add it to the sessions[table]
-	                        if(session.started_at <= result.timestamp && session.ended_at >= result.timestamp){		
-	                            session[table].push(result);
+		                        // Maybe we can suppose that this always be true and remove the if/else and only add it to the sessions[table]
+		                        if(session.started_at <= result.timestamp && session.ended_at >= result.timestamp){		
+		                            session[table].push(result);
 
-	                            // If session hasn't an end, set it as the maximum possible value < Infinity
-	                            if(session.ended_at == Infinity)
-	                            	if(!session.best_ended_at && result.timestamp < Infinity) session.best_ended_at = result.timestamp
-	                            	if(session.best_ended_at && result.timestamp < Infinity && session.best_ended_at < result.timestamp) session.best_ended_at = result.timestamp
+		                            // If session hasn't an end, set it as the maximum possible value < Infinity
+		                            if(session.ended_at == Infinity)
+		                            	if(!session.best_ended_at && result.timestamp < Infinity) session.best_ended_at = result.timestamp
+		                            	if(session.best_ended_at && result.timestamp < Infinity && session.best_ended_at < result.timestamp) session.best_ended_at = result.timestamp
 
-	                        }
-	                        else{
-	                        	sails.log.warn("There's a " + table + " without session");
-	                        }
-	                    });
+		                        }
+		                        else{
+		                        	sails.log.warn("There's a " + table + " without session");
+		                        }
+		                    });
 	                };
 
 	                var insertIntoConnections = function(table){
 
 	                    q = "Select * FROM " + table + " ORDER BY timestamp ASC;";
+	                    if(session)
+		                    db.each(q, function(err,result){
+		                        if(err) return callback(err);
+		                        if(!result) return callback('No results executing query: ' + q);
 
-	                    db.each(q, function(err,result){
-	                        if(err) return callback(err);
-	                        if(!result) return callback('No results executing query: ' + q);
+		                        var hasConnection = false;
+		                        for(var i = 0; i < connections.length; i++){
+		                        	if(connections[i].started_at == result.connstart && connections[i].started_at <= result.timestamp && connections[i].ended_at >= result.timestamp){
+		                        	    connections[i][table].push(result);
+		                        	    hasConnection = true;
+		                        	    // If session hasn't an end, set it as the maximum possible value < Infinity
+		                        	    if(session.ended_at == Infinity)
+		                        	    	if(!session.best_ended_at && result.timestamp < Infinity) session.best_ended_at = result.timestamp
+		                        	    	if(session.best_ended_at && result.timestamp < Infinity && session.best_ended_at < result.timestamp) session.best_ended_at = result.timestamp
+		                        	    break;
+		                        	}
+		                        }
 
-	                        var hasConnection = false;
-	                        for(var i = 0; i < connections.length; i++){
-	                        	if(connections[i].started_at == result.connstart && connections[i].started_at <= result.timestamp && connections[i].ended_at >= result.timestamp){
-	                        	    connections[i][table].push(result);
-	                        	    hasConnection = true;
-	                        	    // If session hasn't an end, set it as the maximum possible value < Infinity
-	                        	    if(session.ended_at == Infinity)
-	                        	    	if(!session.best_ended_at && result.timestamp < Infinity) session.best_ended_at = result.timestamp
-	                        	    	if(session.best_ended_at && result.timestamp < Infinity && session.best_ended_at < result.timestamp) session.best_ended_at = result.timestamp
-	                        	    break;
-	                        	}
-	                        }
-
-	                        if(!hasConnection) sails.log.warn("There's a " + table + " without connection");
-	                    });
+		                        if(!hasConnection) sails.log.warn("There's a " + table + " without connection");
+		                    });
 	                };
 
 	                sails.log('Building other tables');
