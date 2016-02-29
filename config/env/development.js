@@ -48,8 +48,3 @@ module.exports.connections = { //User can CRUD over devices, and can write into 
   port: (process.env.DEV_DATABASE_PORT||'')
  },
 }
-
-module.exports.rsync = {
-  from: '/home/jadriazo/hostviewupload/data',
-  to:   'jadriazo@ucn.inria.fr:/home/jadriazo/hostviewupload'
-}

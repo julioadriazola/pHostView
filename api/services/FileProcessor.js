@@ -211,17 +211,11 @@ module.exports = {
         });
     },
 
-    synchronizeFiles: function (){
-        // cmd = "rsync -a --remove-source-files /home/jadriazo/hostviewupload/data jadriazo@ucn.inria.fr:/home/jadriazo/hostviewupload && rm -rf /home/jadriazo/hostviewupload/data/*";
-        
-        cmd = "/usr/bin/rsync -a --remove-source-files " + sails.config.rsync.from + " " + sails.config.rsync.to + " && rm -rf " + sails.config.rsync.from + "/*"
-        child_process.exec(cmd,function(err,stdout,stderr){
-            if(err) sails.log.error(err);
-            sails.log(stdout);
-            sails.log(stderr);
+    resetFiles: function(){
+        DB.resetFiles(['waitingFile','waitingParent','failed','typeNotfound'],function(err,res){
+            if(err) sails.log.error("There was some error updating files: " + err)
         })
     }
-
 
 
 

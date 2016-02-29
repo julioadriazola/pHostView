@@ -234,6 +234,12 @@ module.exports = {
     	}, nextFunction)
     },
 
+    resetFiles: function(where,nextFunction){
+        if(!pgsql) DB.start();
+
+        pgsql.update('files',{status: 'uploaded',updated_at: new Date()}).where(pgsql.sql.in('status',where)).run(nextFunction);
+    },
+
 
     /*
      * Find if a sepecific value exists in the table specified. If not, it will be created.
