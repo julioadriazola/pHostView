@@ -24,8 +24,8 @@ export PROD_DATABASE_PASSWORD=value
 export PROD_DATABASE_SERVER=value
 export PROD_DATABASE_PORT=value
 export PROD_DATABASE_NAME=value
-export PROD_TCPTRACE_BIN=value 					#It's used in the python code
-export PROD_PROCESS_FOLDER=value				#It's used in the python code
+export PROD_TCPTRACE_BIN=value 					#It's used in the python code. Specify it only in ucn server.
+export PROD_PROCESS_FOLDER=value				#It's used in the python code. Specify it only in ucn server.
 
 export DEV_DATABASE_USER=value
 export DEV_DATABASE_PASSWORD=value
