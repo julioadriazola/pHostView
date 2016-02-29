@@ -66,11 +66,10 @@ And the next tasks to the ucn crontab:
 
 Finally, `sails-hook-schedule` must be installed for the Process Files application, and this 3 task must be added to the config/schedule.js:
 ```javascript
-#<dir to process file application>/config/schedule.js
+//<dir to process file application>/config/schedule.js
 module.exports.schedule = {
-    sailsInContext : true, //If sails is not as global and you want to have it in your task
+    sailsInContext : true,
     tasks          : {
-        // /*Every monday at 1am
          runSQLite : {
              cron : "15 * * * *",
              task : function ()
@@ -156,6 +155,8 @@ The final Schedule result is the  next:
 23:15   Process SQLite 
 ```  
 
+
+***********
 
 # Database Schema
 
