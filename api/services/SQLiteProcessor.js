@@ -129,7 +129,7 @@ module.exports = {
 
 	                    if(last_connection && last_connection.ended_at < Infinity && result.started_at < last_connection.ended_at){
 	                        /*
-	                         * Merging connections can produce lost information. First merge: Only connections with an end timestamp
+	                         * Merging connections can produce lost information.
 	                         */
 	                        sails.log.warn('There are overlaping connections. These have been merged.');
 	                        connection = connections.pop();

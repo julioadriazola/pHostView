@@ -27,7 +27,7 @@ module.exports = {
     getType: function(fn){
         if(fn.indexOf("_stats.db") > -1)                    return 'sqlite'
         else if(fn.indexOf("_last.pcap") > -1)              return 'pcap'
-        // else if(fn.indexOf("_questionnaire.json") > -1)     return 'survey'
+        else if(fn.indexOf("_questionnaire.json") > -1)     return 'survey'
         //json could be pageload or video. It's necessary to see the content to determine it.
         // else if(fn.indexOf(".json") > -1)                   return 'json' 
         else return null
@@ -96,7 +96,7 @@ module.exports = {
 
     
 
-    decompressZIP: function(upload){
+    decompressZIP: function(upload, parent = null){
         var ofn = upload.folder + '/' + upload.basename; //Original file name
         var fn = ofn;
 
@@ -147,11 +147,8 @@ module.exports = {
                     }
 
                     upload.unzipped = unzipped;
-                    if(FileProcessor.getType(upload.basename) == 'pcap'){
-                        PCAPprocessor.process(upload);
-                    }
-                    else if(FileProcessor.getType(upload.basename) == 'survey'){
-                        SurveyProcessor.process(upload);  
+                    if(FileProcessor.getType(upload.basename) == 'survey'){
+                        SurveyProcessor.process(upload,parent);  
                     }
                     else if(FileProcessor.getType(upload.basename) == 'sqlite'){
                         SQLiteProcessor.process(upload);

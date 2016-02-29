@@ -3,7 +3,7 @@ var async = require('async'),
 
 
 module.exports = {
-	process: function(file){
+	process: function(file, session){
 
         async.waterfall([
             function readJSON(callback){
@@ -18,6 +18,7 @@ module.exports = {
                 surv.qoe = parseInt(doc.page2.QoE);
                 surv.duration = doc.duration;
                 surv.file_id = file.id;
+                surv.session_id = session.id;
 
                 /*
                  * TODO: It's necessary to add started_at and ended_at instead duration
