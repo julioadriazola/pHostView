@@ -1,5 +1,6 @@
 var async = require('async'),
-	path = require("path");
+	path = require("path"),
+    PyShell = require('python-shell');
 
 module.exports = {
 	process: function(file,connection){
@@ -36,5 +37,26 @@ module.exports = {
 				});
 			}
 		});
+	},
+
+	resetPcap: function(){
+	    DB.resetEntity('pcap',['waitingFile','waitingParent','failed','typeNotfound'],function(err,res){
+	        if(err) sails.log.error("There was some error updating pcaps: " + err)
+	    })
+	},
+
+	processPcap: function(){
+	    PyShell.run(sails.config.pcapProcessing.script,sails.config.pcapProcessing.options,function(err, res){
+	        if(err) sails.log.error(err);
+	        if(res) for(var i=0; i < res.length; i++) sails.log(res[i]);
+	    })
+	    // cmd = `cd /home/julio/pcapProcessing && /usr/bin/python -c "import os; os.environ['RUNNING_ENV'] = 'DEV'; import helper; helper.Helper.resetPcap();"`;
+	    // child_process.exec(cmd,
+	    //                     { cwd: '/home/julio/pcapProcessing'},
+	    //                     function(err,stdout,stderr){
+	    //                         if(err) sails.log.error(err);
+	    //                         sails.log(stdout);
+	    //                         sails.log(stderr);
+	    //                     });
 	}
 }

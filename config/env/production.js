@@ -50,3 +50,12 @@ module.exports.connections = { //User can CRUD over devices, and can write into 
   port: (process.env.PROD_DATABASE_PORT||'')
  },
 }
+
+
+module.exports.pcapProcessing = {
+  options:{
+    pythonPath: '/usr/bin/python',
+    scriptPath: '/home/jadriazo/pcapProcessing'
+  },
+  script: 'PROD.py'
+}

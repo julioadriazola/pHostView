@@ -4,9 +4,9 @@
 module.exports.schedule = {
     sailsInContext : true, //If sails is not as global and you want to have it in your task
     tasks          : {
-        
+
          runSQLite : {
-             cron : "15 * * * *",
+             cron : "15 1-5,11-23 * * *",
              task : function ()
              {
                 FileProcessor.processOneSQLiteFile();
@@ -24,6 +24,20 @@ module.exports.schedule = {
              task : function ()
              {
                 FileProcessor.processOneFile();
+             }
+         },
+         resetPcapFiles : {
+             cron : "25 5 * * *",
+             task : function ()
+             {
+                PCAP.resetPcap();
+             }
+         },
+         processPcapFiles : {
+             cron : "30 5 * * *",
+             task : function ()
+             {
+                PCAP.processPcap();
              }
          },
 

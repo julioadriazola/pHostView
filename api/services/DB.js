@@ -209,7 +209,7 @@ module.exports = {
     					insert.file_id = parts[i].id;
     					insert.file_order = i+1;
 
-    					sails.log(insert.pcap_id + ',' + insert.file_id + ',' + insert.file_order)
+    					// sails.log(insert.pcap_id + ',' + insert.file_id + ',' + insert.file_order)
 
     					inserts.push(insert);
     				}
@@ -234,10 +234,10 @@ module.exports = {
     	}, nextFunction)
     },
 
-    resetFiles: function(where,nextFunction){
+    resetEntity: function(table,where,nextFunction){
         if(!pgsql) DB.start();
 
-        pgsql.update('files',{status: 'uploaded',updated_at: new Date()}).where(pgsql.sql.in('status',where)).run(nextFunction);
+        pgsql.update(table,{status: 'uploaded',updated_at: new Date()}).where(pgsql.sql.in('status',where)).run(nextFunction);
     },
 
 

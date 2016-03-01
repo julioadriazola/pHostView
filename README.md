@@ -52,14 +52,14 @@ For the main purpose of processing, it's necessary to add some cronjobs to the s
 
 ```bash
 #(At **:10) sync files between muse and ucn servers
-10 * * * * rsync -a --remove-source-files /home/jadriazo/hostviewupload/data jadriazo@ucn.inria.fr:/home/jadriazo/hostviewupload && rm -rf /home/jadriazo/hostviewupload/data/*
+10 1-5,11-23 * * * rsync -a --remove-source-files /home/jadriazo/hostviewupload/data jadriazo@ucn.inria.fr:/home/jadriazo/hostviewupload && rm -rf /home/jadriazo/hostviewupload/data/*
 ```
 
 And the next tasks to the ucn crontab:
 ```bash
 #For production
-25 5 * * * cd /home/jadriazo/pcapProcessing; python -c "import os; os.environ['RUNNING_ENV'] = 'PROD'; import helper; helper.Helper.resetPcap()"
-30 5 * * * cd /home/jadriazo/pcapProcessing; python -c "import os; os.environ['RUNNING_ENV'] = 'PROD'; import helper; helper.Helper.processNextPcap()"
+#25 5 * * * cd /home/jadriazo/pcapProcessing; python -c "import os; os.environ['RUNNING_ENV'] = 'PROD'; import helper; helper.Helper.resetPcap()"
+#30 5 * * * cd /home/jadriazo/pcapProcessing; python -c "import os; os.environ['RUNNING_ENV'] = 'PROD'; import helper; helper.Helper.processNextPcap()"
 
 #Note that for do the same in development it's only necessary to change the PROD value by DEV
 ```
@@ -70,8 +70,9 @@ Finally, `sails-hook-schedule` must be installed for the Process Files applicati
 module.exports.schedule = {
     sailsInContext : true,
     tasks          : {
+
          runSQLite : {
-             cron : "15 * * * *",
+             cron : "15 1-5,11-23 * * *",
              task : function ()
              {
                 FileProcessor.processOneSQLiteFile();
@@ -91,9 +92,25 @@ module.exports.schedule = {
                 FileProcessor.processOneFile();
              }
          },
+         resetPcapFiles : {
+             cron : "25 5 * * *",
+             task : function ()
+             {
+                PCAP.resetPcap();
+             }
+         },
+         processPcapFiles : {
+             cron : "30 5 * * *",
+             task : function ()
+             {
+                PCAP.processPcap();
+             }
+         },
+
 
     }
 };
+
 
 ```
 
@@ -117,16 +134,7 @@ The final Schedule result is the  next:
 05:15   Process SQLite
 05:25   RESET PCAP
 05:30   PROCESS PCAP (TCPTRACE)
-06:10   Synchronize files   
-06:15   Process SQLite   
-07:10   Synchronize files   
-07:15   Process SQLite   
-08:10   Synchronize files   
-08:15   Process SQLite
-09:10   Synchronize files   
-09:15   Process SQLite   
-10:10   Synchronize files   
-10:15   Process SQLite   
+[IDLE WINDOW-TIME TO PROCESS PCAP]
 11:10   Synchronize files   
 11:15   Process SQLite   
 12:10   Synchronize files   
@@ -157,7 +165,6 @@ The final Schedule result is the  next:
 
 
 ***********
-
 
 
 # Database Schema

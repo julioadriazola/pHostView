@@ -212,10 +212,10 @@ module.exports = {
     },
 
     resetFiles: function(){
-        DB.resetFiles(['waitingFile','waitingParent','failed','typeNotfound'],function(err,res){
+        DB.resetEntity('files',['waitingFile','waitingParent','failed','typeNotfound'],function(err,res){
             if(err) sails.log.error("There was some error updating files: " + err)
         })
-    }
+    },
 
 
 
