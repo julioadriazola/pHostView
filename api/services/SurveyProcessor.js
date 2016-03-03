@@ -25,7 +25,13 @@ module.exports = {
                  * duration attribute must be deleted from DB.
                  */
                 DB.insertOne('surveys',surv,function(err,survey){
-                	if(err) return callback(err);
+                    if(err){
+                        file.status = 'failed'
+                        file.error_info = "It was impossible to insert values to surveys table"
+                        return callback(file.error_info + ": " + err);
+                    }
+
+                    sails.log.info("Survey created with id: " + survey.id)
                 	return callback(null,doc,survey);
                 })
             },
@@ -48,6 +54,7 @@ module.exports = {
                 }
 
                 DB.insert('survey_purpose_tags',purposes,function(err,inserted_values){
+                    if(err) return callback(survey)
                 	callback(null,doc,survey);
                 });
             },
@@ -69,12 +76,26 @@ module.exports = {
                 }
 
                 DB.insert('survey_problem_tags',problems,function(err,inserted_values){
+                    if(err) return callback(survey)
                 	callback(null,doc,survey);
                 });
             }
         ],
-        function(err,survey,other){
-            return FileProcessor.endProcess(err,file)
+        function(err){
+            if(err && err.id) { //If it's a survey
+                DB.deleteRow('surveys',{id: err.id}, function(qerr,res){
+                    
+                    //This happen cause all the survey_* tables has a ON DELETE CASCADE statement.
+                    sails.log.warn("All the information associated with this survey (id: " +  err.id + ") was deleted")
+
+
+                    file.status = 'failed'
+                    file.error_info = "There was some errors processing the survey file"
+
+                    return FileProcessor.endProcess(null,file)
+                })
+            }
+            else return FileProcessor.endProcess(err,file)
         });  
     }
 

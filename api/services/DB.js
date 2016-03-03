@@ -113,7 +113,7 @@ module.exports = {
     insert: function(table, values, nextFunction){
     	if(!pgsql) DB.start();
 
-    	if(values.length>0)
+    	if(values.length>0){
 	    	pgsql.insert(table,values).returning('*').rows(function(err,inserted_values){
 
 
@@ -129,6 +129,7 @@ module.exports = {
 	    		
 	    		if(nextFunction) nextFunction(err,inserted_values);
 	    	});
+        }
 	    else {
 	    	sails.log.info("Nothing to insert into " + table);
 	    	if(nextFunction) nextFunction(false,[]);

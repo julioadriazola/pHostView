@@ -230,7 +230,6 @@ module.exports = {
 
 	    ],
 	    function(err){
-	    	if(err) sails.log.error(err);
 	        return FileProcessor.endProcess(err,file)
 	    });
 
@@ -247,7 +246,14 @@ module.exports = {
 				sess.file_id = file.id
 
 				DB.insertOne('sessions',sess,function(err,sess_c){
-					callback(null,sess_c);
+					if(err){
+					    file.status = 'failed'
+					    file.error_info = "It was impossible to insert values to sessions table"
+					    return callback(file.error_info + ": " + err);
+					}
+
+					sails.log.info("Survey created with id: " + sess_c.id)
+					return callback(null,sess_c);
 				});
 			},
 			/*
@@ -270,8 +276,10 @@ module.exports = {
 					activities.push(act);
 				}
 
-				DB.insert('activities',activities);
-				return callback(null,sess);
+				DB.insert('activities',activities,function(err,inserted_values){
+                    if(err) return callback(sess)
+					callback(null,sess);
+                });
 			},
 			function createBatteryLogs(sess,callback){
 				var battery_logs=[];
@@ -285,8 +293,10 @@ module.exports = {
 					battery_logs.push(b);
 				}
 
-				DB.insert('power_states',battery_logs);
-				return callback(null,sess);
+				DB.insert('power_states',battery_logs,function(err,inserted_values){
+                    if(err) return callback(sess)
+					callback(null,sess);
+                });
 			},
 			function createBrowserActivity(sess,callback){
 				var b_acts=[];
@@ -301,8 +311,10 @@ module.exports = {
 					b_acts.push(b);
 				}
 
-				DB.insert('browser_activity',b_acts);
-				return callback(null,sess);
+				DB.insert('browser_activity',b_acts,function(err,inserted_values){
+                    if(err) return callback(sess)
+					callback(null,sess);
+                });
 			},
 			function createIO(sess,callback){
 				var ios=[];
@@ -319,8 +331,10 @@ module.exports = {
 					ios.push(io);
 				}
 
-				DB.insert('io',ios);
-				return callback(null,sess);
+				DB.insert('io',ios,function(err,inserted_values){
+                    if(err) return callback(sess)
+					callback(null,sess);
+                });
 			},
 			function createPorts(sess,callback){
 				var ports=[];
@@ -345,8 +359,10 @@ module.exports = {
 					ports.push(port);
 				}
 
-				DB.insert('ports',ports);
-				return callback(null,sess);
+				DB.insert('ports',ports,function(err,inserted_values){
+                    if(err) return callback(sess)
+					callback(null,sess);
+                });
 			},
 			function createProcesses(sess,callback){
 				var procs=[];
@@ -363,8 +379,10 @@ module.exports = {
 					procs.push(proc);
 				}
 
-				DB.insert('processes',procs);
-				return callback(null,sess);
+				DB.insert('processes',procs,function(err,inserted_values){
+                    if(err) return callback(sess)
+					callback(null,sess);
+                });
 			},
 			function createSystemInformation(sess,callback){
 				var infos=[];
@@ -389,8 +407,10 @@ module.exports = {
 					infos.push(si);
 				}
 
-				DB.insert('device_info',infos);
-				return callback(null,sess);
+				DB.insert('device_info',infos,function(err,inserted_values){
+                    if(err) return callback(sess)
+					callback(null,sess);
+                });
 			},
 			function createWifiStats(sess,callback){
 				var stats=[];
@@ -411,8 +431,10 @@ module.exports = {
 					stats.push(stat);
 				}
 
-				DB.insert('wifi_stats',stats);
-				return callback(null,sess);
+				DB.insert('wifi_stats',stats,function(err,inserted_values){
+                    if(err) return callback(sess)
+					callback(null,sess);
+                });
 			},
 
 			function createNetLabels(sess,callback){
@@ -430,8 +452,10 @@ module.exports = {
 					netlabels.push(netlabel);
 				}
 
-				DB.insert('netlabels',netlabels);
-				return callback(null,sess);
+				DB.insert('netlabels',netlabels,function(err,inserted_values){
+                    if(err) return callback(sess)
+					callback(null,sess);
+                });
 			},
 
 			function createConnections(sess, callback){
@@ -515,7 +539,7 @@ module.exports = {
 						if(err){
 							file.status = 'failed'
 							file.error_info =  "There's some error inserting connections: " + err
-							return callback(file.error_info)
+							return callback({id: connection.session_id})
 						}
 						sails.log.info("Connection inserted with id: " + con_c.id);
 
@@ -568,7 +592,7 @@ module.exports = {
 							if(err){
 								file.status = 'failed'
 								file.error_info =  "There's some error querying/inserting locations: " + err
-								return callback(file.error_info)
+								return callback(sess)
 							}
 
 							createConnection(loc_c.id,conn,cwl)
@@ -578,12 +602,25 @@ module.exports = {
 					else createConnection(null,conn,cwl);
 
 				}
+
 				return callback(null,sess);
 			},
 
 		],
 		function(err){
-			return cb(err); //Go to the next file
+			if(err && err.id)
+				DB.deleteRow('sessions',{id: err.id}, function(qerr,res){
+				    
+				    //This happen cause all the tables has a ON DELETE CASCADE statement for the session_id.
+				    sails.log.warn("All the information associated with this session (id: " +  err.id + ") was deleted")
+
+
+				    file.status = 'failed'
+				    file.error_info = "There was some errors processing the survey file"
+
+				    return cb(null)
+				})
+			else return cb(err); //Go to the next file
 		});
 
     },

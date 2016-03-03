@@ -80,6 +80,7 @@ module.exports = {
 		    	delete vsess.outDelay
 		    	delete vsess.outLoss
 		    	delete vsess.run
+		    	delete vsess.i
 		    	delete vsess.start_timestamp
 		    	delete vsess.end_timestamp
 
@@ -186,17 +187,38 @@ module.exports = {
 		    },
 
 		    function createOffScreenEvents(video_session,callback){
-		    	// TODO: I have no examples
+		    	// "OffScreenEvents": [
+		    	// 	{
+		    	// 		"id": 1,
+		    	// 		"start_timestamp": 1457001284427,
+		    	// 		"end_timestamp": 1457001292372,
+		    	// 		"video_session": 0
+		    	// 	}
+		    	// ]
 		    	var vals=[];
 		    	var val;
 
+		    	while(json.OffScreenEvents.length > 0){
+		    		val 						= json.OffScreenEvents.shift();
+		    		val.started_at 				= new Date(val.start_timestamp);
+		    		val.ended_at   				= new Date(val.end_timestamp);
+		    		val.video_session_id 		= video_session.id
 
-		    	// DB.insert('video_off_screen_event',vals,function(err,inserted_values){
-	    		// 	if(err)	return callback(video_session)
-		    	// 	callback(null,video_session);
-		    	// });		
+		    		delete val.id
+		    		delete val.start_timestamp
+		    		delete val.end_timestamp
+		    		delete val.video_session
 
-		    	callback(null,video_session)
+		    		vals.push(val);
+
+
+		    	}
+
+
+		    	DB.insert('video_off_screen_event',vals,function(err,inserted_values){
+	    			if(err)	return callback(video_session)
+		    		callback(null,video_session);
+		    	});
 		    },
 
 		    function createBufferedPlayTime(video_session,callback){
@@ -446,7 +468,7 @@ module.exports = {
 
 		],
 		function(err){
-			if(err && 'id' in err) { //If it's a session
+			if(err && err.id) { //If it's a session
 				DB.deleteRow('video_session',{id: err.id}, function(qerr,res){
 					
 					//This happen cause all the video_* tables has a ON DELETE CASCADE statement.
