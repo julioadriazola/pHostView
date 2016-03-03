@@ -86,7 +86,7 @@ module.exports = {
 		    	DB.insertOne('video_session',vsess,function(err,vsess_c){
 		    		if(err){
 		    			file.status = 'failed'
-		    			file.error_info = "It was impossible to insert values to video_session table: "
+		    			file.error_info = "It was impossible to insert values to video_session table"
 		    			return callback(file.error_info + ": " + err);
 		    		}
 
@@ -124,6 +124,7 @@ module.exports = {
 		    	}
 
 		    	DB.insert('video_resolution',vres,function(err,inserted_values){
+		    		if(err) return callback(video_session)
 		    		callback(null,video_session);
 		    	});
 		    },
@@ -178,6 +179,7 @@ module.exports = {
 		    	}
 
 				DB.insert('video_playback_quality_sample',vals,function(err,inserted_values){
+					if(err) return callback(video_session)
 					callback(null,video_session);
 				});		    	
 
@@ -190,6 +192,7 @@ module.exports = {
 
 
 		    	// DB.insert('video_off_screen_event',vals,function(err,inserted_values){
+	    		// 	if(err)	return callback(video_session)
 		    	// 	callback(null,video_session);
 		    	// });		
 
@@ -228,6 +231,7 @@ module.exports = {
 		    	}
 
 		    	DB.insert('video_buffered_play_time_sample',vals,function(err,inserted_values){
+		    		if(err) return callback(video_session)
 		    		callback(null,video_session);
 		    	});		
 		    },
@@ -270,6 +274,7 @@ module.exports = {
 		    	}
 
 		    	DB.insert('video_player_size',vals,function(err,inserted_values){
+		    		if(err) return callback(video_session)
 		    		callback(null,video_session);
 		    	});
 		    },
@@ -308,6 +313,7 @@ module.exports = {
 		    	}
 
 		    	DB.insert('video_buffering_event',vals,function(err,inserted_values){
+		    		if(err) return callback(video_session)
 		    		callback(null,video_session);
 		    	});
 		    },
@@ -343,6 +349,7 @@ module.exports = {
 		    	}
 
 		    	DB.insert('video_pause_event',vals,function(err,inserted_values){
+		    		if(err) return callback(video_session)
 		    		callback(null,video_session);
 		    	});
 		    },
@@ -353,6 +360,8 @@ module.exports = {
 		     */
 		    function buildBufferingEventsDictionary(video_session,callback){
 		    	DB.select('video_buffering_event',{video_session_id: video_session.id},function(err,result){
+		    		if(err)	return callback(video_session)
+
 		    		var dict = {};
 
 		    		for(var i = 0; i < result.rows.length; i++){
@@ -369,13 +378,14 @@ module.exports = {
 		    				}
 		    			}
 		    		}
-
-		    		sails.log(dict);
+		    		
 		    		callback(null,video_session,dict)
 		    	});
 		    },
 		    function buildPauseEventsDictionary(video_session,b,callback){
 		    	DB.select('video_pause_event',{video_session_id: video_session.id},function(err,result){
+		    		if(err)	return callback(video_session)
+
 		    		var dict = {};
 
 		    		for(var i = 0; i < result.rows.length; i++){
@@ -392,7 +402,6 @@ module.exports = {
 		    			}
 		    		}
 
-		    		sails.log(dict);
 		    		callback(null,video_session,b,dict)
 
 		    	});
@@ -428,6 +437,7 @@ module.exports = {
 		    	}
 
 		    	DB.insert('video_seek_event',vals,function(err,inserted_values){
+		    		if(err)	return callback(video_session)
 		    		callback(null,video_session);
 		    	});
 
@@ -436,7 +446,19 @@ module.exports = {
 
 		],
 		function(err){
-		    return nextFunction(err)
+			if(err && 'id' in err) { //If it's a session
+				DB.deleteRow('video_session',{id: err.id}, function(qerr,res){
+					
+					//This happen cause all the video_* tables has a ON DELETE CASCADE statement.
+					sails.log.warn("All the information associated with this video session (id: " +  err.id + ") was deleted")
+
+
+					file.status = 'failed'
+					file.error_info = "There was some errors processing the video streaming JSON"
+					return nextFunction(null)
+				})
+			}
+		    else return nextFunction(err)
 		});
 	}
 }

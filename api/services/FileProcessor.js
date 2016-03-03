@@ -16,7 +16,9 @@ module.exports = {
     processOneFile: function(){
         DB.nextFileToProcess(function(err,file){
             if(err) return sails.log.error("There's some error: " + err);
-            FileProcessor.nextIfParentExists(file);
+
+            if(FileProcessor.getType(file.basename) == 'json') FileProcessor.decompressZIP(file,{id: 1})
+            else FileProcessor.nextIfParentExists(file);
         });
     },
 
@@ -29,7 +31,7 @@ module.exports = {
         else if(fn.indexOf("_last.pcap") > -1)              return 'pcap'
         else if(fn.indexOf("_questionnaire.json") > -1)     return 'survey'
         //json could be pageload or video. It's necessary to see the content to determine it.
-        // else if(fn.indexOf(".json") > -1)                   return 'json' 
+        else if(fn.indexOf(".json") > -1)                   return 'json' 
         else return null
 
     },
@@ -155,7 +157,7 @@ module.exports = {
                     }
                     else if(FileProcessor.getType(upload.basename) == 'json'){
                         //TODO: write json processor
-                        FileProcessor.endProcess(upload);
+                        JSONProcessor.process(upload,parent);
                     }
                     else{
                         FileProcessor.endProcess(upload);

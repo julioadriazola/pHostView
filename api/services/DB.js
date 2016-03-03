@@ -117,8 +117,13 @@ module.exports = {
 	    	pgsql.insert(table,values).returning('*').rows(function(err,inserted_values){
 
 
-	    		if(err) return sails.log.error("There's some error inserting "+ table +": " + err);
-	    		sails.log.info('Rows inserted in table '+table+': ' + inserted_values.length + ' (' + inserted_values[0].id + '-' + inserted_values[inserted_values.length - 1].id + ')');
+	    		if(err) sails.log.error("There's some error inserting "+ table +": " + err);
+	    		else {
+                    if(inserted_values.length == 1)
+                        sails.log.info('Rows inserted in table '+table+': ' + inserted_values.length + ' (id: ' + inserted_values[0].id + ')')
+                    else
+                        sails.log.info('Rows inserted in table '+table+': ' + inserted_values.length + ' (ids: ' + inserted_values[0].id + '-' + inserted_values[inserted_values.length - 1].id + ')')
+                }
 
 
 	    		
@@ -179,6 +184,12 @@ module.exports = {
             .where(pgsql.sql.and({'device_id': file.device_id},pgsql.sql.like('basename',base)))
             .order("cast(split_part(basename,'_',3) as integer) ASC")
             .run(nextFunction)
+    },
+
+    deleteRow: function(table,value,nextFunction){
+        if(!pgsql) DB.start();
+
+        pgsql.delete(table).where(value).rows(nextFunction);
     },
 
     /*
