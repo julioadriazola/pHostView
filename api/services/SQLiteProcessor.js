@@ -460,7 +460,19 @@ module.exports = {
 
 			function createConnections(sess, callback){
 
-				var createDNS = function (conn,dns_array){
+				var runCallback = function(){
+					//When dns and http are processed, then it's possible to run the callback
+					var nextf=true;
+					for(var j= 0; j < conn_processed.length; j++){
+						if(!(conn_processed[j].dns && conn_processed[j].http )){
+							nextf = false;
+							break;
+						}
+					}
+					return nextf
+				}
+
+				var createDNS = function (conn,dns_array,conn_index){
 
 
     				var dnss=[];
@@ -486,10 +498,15 @@ module.exports = {
     					dnss.push(dns);
     				}
 
-    				DB.insert('dns_logs',dnss);
+    				DB.insert('dns_logs',dnss,function(err,inserted_values){
+	                    if(err) return callback(sess)
+
+	                    conn_processed[conn_index].dns = true;
+	                    if(runCallback()) return callback(null,sess);
+	                });
     			};
 
-    			var createHTTP = function(conn,http_array){
+    			var createHTTP = function(conn,http_array,conn_index){
     				var https=[];
     				var http;
     				while(http_array.length>0){
@@ -526,10 +543,15 @@ module.exports = {
     					https.push(http);
     				}
 
-    				DB.insert('http_logs',https);
+    				DB.insert('http_logs',https,function(err,inserted_values){
+	                    if(err) return callback(sess)
+	                    conn_processed[conn_index].http = true;
+	                	if(runCallback()) return callback(null,sess);
+
+	                });
     			}
 
-				var createConnection = function(location_id,connection,connection_with_location){
+				var createConnection = function(location_id,connection,connection_with_location,index){
 					
 					connection.location_id = location_id;
 					var dns_array = connection_with_location.dns;
@@ -543,13 +565,18 @@ module.exports = {
 						}
 						sails.log.info("Connection inserted with id: " + con_c.id);
 
-						createDNS(con_c,dns_array);
-						createHTTP(con_c,http_array);
+						createDNS(con_c,dns_array,index);
+						createHTTP(con_c,http_array,index);
 					});
 				}
 
 				var connections=[];
+				var conn_processed = [];
+				for(var i = 0; i < session.connections.length; i++)
+					conn_processed.push({dns:false,http:false});
+
 				var cwl={}, conn= {}, loc = {};
+				var i  = 0;
 				while(session.connections.length>0){
 					
 					cwl= session.connections.shift(); //connection with location info
@@ -595,15 +622,14 @@ module.exports = {
 								return callback(sess)
 							}
 
-							createConnection(loc_c.id,conn,cwl)
+							createConnection(loc_c.id,conn,cwl,i)
 						});
 
 					}
-					else createConnection(null,conn,cwl);
+					else createConnection(null,conn,cwl,i);
 
+					i++;
 				}
-
-				return callback(null,sess);
 			},
 
 		],
