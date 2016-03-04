@@ -16,9 +16,7 @@ module.exports = {
     processOneFile: function(){
         DB.nextFileToProcess(function(err,file){
             if(err) return sails.log.error("There's some error: " + err);
-
-            if(FileProcessor.getType(file.basename) == 'json') FileProcessor.decompressZIP(file,{id: 1})
-            else FileProcessor.nextIfParentExists(file);
+            FileProcessor.nextIfParentExists(file);
         });
     },
 
