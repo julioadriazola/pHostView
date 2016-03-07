@@ -1,0 +1,17 @@
+{ // this is an example -- update values before use !!
+  "apps" : [{ 
+    "name"         : "HostViewFrontEnd-dev",
+    "script"       : "app.js",
+    "error_file"   : "./logs/erros.log",   //Log errors
+    "out_file"     : "./logs/out.log",     //Log outputs
+    "log_date_format"   : "YYYY.MM.DD HH:mm:ss.SSS",
+    "instances"    : "4",
+    "run_as_user"  : "jadriazo",
+    "run_as_group" : "jadriazo",
+    "env": {
+       "NODE_ENV" : "development",
+       "DEBUG"    : "hostview*",
+	     "PORT"     : "3201"
+     }
+  }]
+}
