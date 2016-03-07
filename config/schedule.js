@@ -9,6 +9,7 @@ module.exports.schedule = {
              cron : "15 1-5,11-23 * * *",
              task : function ()
              {
+                sails.log.info("runSQLite task fired");
                 FileProcessor.processOneSQLiteFile();
              }
          },
@@ -16,6 +17,7 @@ module.exports.schedule = {
              cron : "25 3 * * *",
              task : function ()
              {
+                sails.log.info("resetOtherFiles task fired");
                 FileProcessor.resetFiles();
              }
          },
@@ -23,6 +25,7 @@ module.exports.schedule = {
              cron : "30 3 * * *",
              task : function ()
              {
+                sails.log.info("runOtherFiles task fired");
                 FileProcessor.processOneFile();
              }
          },
@@ -30,6 +33,7 @@ module.exports.schedule = {
              cron : "25 5 * * *",
              task : function ()
              {
+                sails.log.info("resetPcapFiles task fired");
                 PCAP.resetPcap();
              }
          },
@@ -37,6 +41,7 @@ module.exports.schedule = {
              cron : "30 5 * * *",
              task : function ()
              {
+                sails.log.info("processPcapFiles task fired");
                 PCAP.processPcap();
              }
          },
