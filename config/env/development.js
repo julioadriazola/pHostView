@@ -51,7 +51,7 @@ module.exports.connections = { //User can CRUD over devices, and can write into 
 
 module.exports.pcapProcessing = {
   options:{
-    pythonPath: '/usr/bin/python',
+    pythonPath: '/home/jadriazo/pcapProcessing/venv/bin/python',
     scriptPath: '/home/jadriazo/pcapProcessing'
   },
   script: 'DEV.py'

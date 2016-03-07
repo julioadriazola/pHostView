@@ -1,6 +1,6 @@
 { // this is an example -- update values before use !!
   "apps" : [{ 
-    "name"         : "HostViewFrontEnd-dev",
+    "name"         : "process-dev",
     "script"       : "app.js",
     "error_file"   : "./logs/erros.log",   //Log errors
     "out_file"     : "./logs/out.log",     //Log outputs
