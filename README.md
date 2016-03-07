@@ -55,16 +55,7 @@ For the main purpose of processing, it's necessary to add some cronjobs to the s
 10 1-5,11-23 * * * rsync -a --remove-source-files /home/jadriazo/hostviewupload/data jadriazo@ucn.inria.fr:/home/jadriazo/hostviewupload && rm -rf /home/jadriazo/hostviewupload/data/*
 ```
 
-And the next tasks to the ucn crontab:
-```bash
-#For production
-#25 5 * * * cd /home/jadriazo/pcapProcessing; python -c "import os; os.environ['RUNNING_ENV'] = 'PROD'; import helper; helper.Helper.resetPcap()"
-#30 5 * * * cd /home/jadriazo/pcapProcessing; python -c "import os; os.environ['RUNNING_ENV'] = 'PROD'; import helper; helper.Helper.processNextPcap()"
-
-#Note that for do the same in development it's only necessary to change the PROD value by DEV
-```
-
-Finally, `sails-hook-schedule` must be installed for the Process Files application, and this 3 task must be added to the config/schedule.js:
+Finally, `sails-hook-schedule` must be installed for the Process Files application, and this 5 task must be added to the config/schedule.js:
 ```javascript
 //<dir to process file application>/config/schedule.js
 module.exports.schedule = {
@@ -75,35 +66,35 @@ module.exports.schedule = {
              cron : "15 1-5,11-23 * * *",
              task : function ()
              {
-                FileProcessor.processOneSQLiteFile();
+                FileProcessor.processOneSQLiteFile();           # Process SQLite Files
              }
          },
          resetOtherFiles : {
              cron : "25 3 * * *",
              task : function ()
              {
-                FileProcessor.resetFiles();
+                FileProcessor.resetFiles();                     # Mark not errored files as 'uploaded'
              }
          },
          runOtherFiles : {
              cron : "30 3 * * *",
              task : function ()
              {
-                FileProcessor.processOneFile();
+                FileProcessor.processOneFile();                 # Process other Files (It includes fill the pcap table)
              }
          },
          resetPcapFiles : {
              cron : "25 5 * * *",
              task : function ()
              {
-                PCAP.resetPcap();
+                PCAP.resetPcap();                               # Mark not errored pcaps as 'uploaded'
              }
          },
          processPcapFiles : {
              cron : "30 5 * * *",
              task : function ()
              {
-                PCAP.processPcap();
+                PCAP.processPcap();                             # Process pcap files (From pcap table)
              }
          },
 
@@ -166,6 +157,26 @@ The final Schedule result is the  next:
 
 ***********
 
+# Install
+
+For the next steps it's assumed that you have installed nodejs and npm. With this in consideration, for installation it's necessary to do the next:
+
+Download repository in a folder called HostView with something like:
+```bash
+$ git checkout git@github.com:julioadriazola/pHostView.git       #for SSH or...
+$ git checkout https://github.com/julioadriazola/pHostView.git   #for HTTPS
+```
+Then, you have to run: 
+```bash
+$ cd pHostView
+$ npm install
+$ npm install pg-bricks
+$ npm install sails-hook-schedule
+$ npm install sqlite3
+$ npm install async
+$ npm install mkdirp
+$ npm install python-shell
+```
 
 # Database Schema
 
