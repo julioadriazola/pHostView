@@ -251,7 +251,7 @@ module.exports = {
 
         if(table=='SQLiteFiles')
             pgsql
-                .update(table,{status: 'uploaded',updated_at: new Date()})
+                .update('files',{status: 'uploaded',updated_at: new Date()})
                 .where(pgsql.sql.and(pgsql.sql.like('basename','%stats.db%'),pgsql.sql.in('status',where)))
                 .run(nextFunction);
         else pgsql
