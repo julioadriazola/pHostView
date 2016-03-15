@@ -173,7 +173,11 @@ module.exports = {
 
 		                        }
 		                        else{
-		                        	sails.log.warn("There's a " + table + " without session");
+		                        	//Only report once
+		                        	if(reported.indexOf(table) == -1){
+		                        		reported.push(table);
+		                        		sails.log.warn("There are " + table + " without session");
+		                        	}
 		                        }
 		                    });
 	                };
