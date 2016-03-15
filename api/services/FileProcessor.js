@@ -217,6 +217,12 @@ module.exports = {
         })
     },
 
+    resetSQLiteFiles: function(){
+        DB.resetEntity('SQLiteFiles',['waitingFile','waitingParent','failed','typeNotfound'],function(err,res){
+            if(err) sails.log.error("There was some error updating SQLiteFiles: " + err)
+        })
+    },
+
 
 
 

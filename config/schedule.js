@@ -10,6 +10,7 @@ module.exports.schedule = {
              task : function ()
              {
                 sails.log.info("runSQLite task fired");
+                FileProcessor.resetSQLiteFiles()
                 FileProcessor.processOneSQLiteFile();
              }
          },

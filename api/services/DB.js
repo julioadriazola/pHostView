@@ -249,7 +249,15 @@ module.exports = {
     resetEntity: function(table,where,nextFunction){
         if(!pgsql) DB.start();
 
-        pgsql.update(table,{status: 'uploaded',updated_at: new Date()}).where(pgsql.sql.in('status',where)).run(nextFunction);
+        if(table=='SQLiteFiles')
+            pgsql
+                .update(table,{status: 'uploaded',updated_at: new Date()})
+                .where(pgsql.sql.and(pgsql.sql.like('basename','%stats.db%'),pgsql.sql.in('status',where)))
+                .run(nextFunction);
+        else pgsql
+                .update(table,{status: 'uploaded',updated_at: new Date()})
+                .where(pgsql.sql.in('status',where))
+                .run(nextFunction);
     },
 
 
