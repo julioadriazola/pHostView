@@ -13,6 +13,7 @@ module.exports = {
 	            var db = new sqlite.Database(file.unzipped);
 	            var session = {};
 	            var connections = [];
+	            var reported=[];
 	            var q='';
 
 	            db.serialize(function(){
@@ -151,6 +152,8 @@ module.exports = {
 
 	                });
 
+					
+
 	                var insertIntoSessions = function(table){
 
 	                    q = "Select * FROM " + table + " ORDER BY timestamp ASC;";
@@ -196,7 +199,11 @@ module.exports = {
 		                        	}
 		                        }
 
-		                        if(!hasConnection) sails.log.warn("There's a " + table + " without connection");
+		                        //Only report once
+		                        if(!hasConnection && reported.indexOf(table) == -1 ) {
+		                        	reported.push(table);
+		                        	sails.log.warn("There are " + table + " without connection");
+		                        }
 		                    });
 	                };
 
