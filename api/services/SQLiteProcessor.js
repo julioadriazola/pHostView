@@ -244,6 +244,7 @@ module.exports = {
 				sess.started_at = new Date(session.started_at);
 				sess.ended_at = new Date(session.ended_at);
 				sess.file_id = file.id
+				sess.device_id = file.device_id
 
 				DB.insertOne('sessions',sess,function(err,sess_c){
 					if(err){
