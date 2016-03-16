@@ -117,7 +117,7 @@ module.exports = {
     	if(values.length > MAX_INSERT){
             var insertNow   = values.slice(0,MAX_INSERT)
             var insertNext  = values.slice(MAX_INSERT+1,values.length);
-            psql.insert(table,insertNow).returning('*').rows(function(err,inserted_values){
+            pgsql.insert(table,insertNow).returning('*').rows(function(err,inserted_values){
                 if(err) sails.log.error("There's some error inserting "+ table +": " + err);
                 else {
                     if(inserted_values.length == 1)
