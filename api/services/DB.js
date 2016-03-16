@@ -3,7 +3,7 @@ var util = require('util'),
 	async = require('async');
 
 var pgsql = null
-var MAX_INSERT = 10000;
+var MAX_INSERT = 6000;
 
 /*
  * I prefered to use pg-bricks instead the Waterline (sails) libray because I had some weird problems
