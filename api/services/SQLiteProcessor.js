@@ -32,7 +32,7 @@ module.exports = {
 							LEFT JOIN session b
 								ON a.timestamp < b.timestamp
 								AND b.event IN ('pause','stop','autostop','suspend')
-							WHERE a.event IN ('start','restart','autorestart','resume')
+							WHERE a.event IN ('start','restart','autorestart','resume','autostart')
 							GROUP BY a.timestamp,a.event
 						) a`;
 
@@ -55,7 +55,7 @@ module.exports = {
 						LEFT JOIN session b
 							ON a.timestamp < b.timestamp
 							AND b.event IN ('pause','stop','autostop','suspend')
-						WHERE a.event IN ('start','restart','autorestart','resume')
+						WHERE a.event IN ('start','restart','autorestart','resume','autostart')
 						GROUP BY a.timestamp,a.event
 						ORDER BY a.timestamp ASC`;
 	                /*
