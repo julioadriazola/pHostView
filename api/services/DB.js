@@ -3,6 +3,7 @@ var util = require('util'),
 	async = require('async');
 
 var pgsql = null
+var MAX_INSERT = 10000;
 
 /*
  * I prefered to use pg-bricks instead the Waterline (sails) libray because I had some weird problems
@@ -113,7 +114,22 @@ module.exports = {
     insert: function(table, values, nextFunction){
     	if(!pgsql) DB.start();
 
-    	if(values.length>0){
+    	if(values.length > MAX_INSERT){
+            var insertNow   = values.slice(0,MAX_INSERT)
+            var insertNext  = values.slice(MAX_INSERT+1,values.length);
+            psql.insert(table,insertNow).returning('*').rows(function(err,inserted_values){
+                if(err) sails.log.error("There's some error inserting "+ table +": " + err);
+                else {
+                    if(inserted_values.length == 1)
+                        sails.log.info('Rows inserted in table '+table+': ' + inserted_values.length + ' (id: ' + inserted_values[0].id + ')')
+                    else
+                        sails.log.info('Rows inserted in table '+table+': ' + inserted_values.length + ' (ids: ' + inserted_values[0].id + '-' + inserted_values[inserted_values.length - 1].id + ')')
+                }
+
+                DB.insert(table,insertNext,nextFunction);
+            });
+        }
+        else if (values.length > 0)
 	    	pgsql.insert(table,values).returning('*').rows(function(err,inserted_values){
 
 
@@ -129,7 +145,6 @@ module.exports = {
 	    		
 	    		if(nextFunction) nextFunction(err,inserted_values);
 	    	});
-        }
 	    else {
 	    	sails.log.info("Nothing to insert into " + table);
 	    	if(nextFunction) nextFunction(false,[]);
