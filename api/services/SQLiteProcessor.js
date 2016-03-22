@@ -264,7 +264,7 @@ module.exports = {
 					    return callback(file.error_info + ": " + err);
 					}
 
-					sails.log.info("Survey created with id: " + sess_c.id)
+					sails.log.info("Session created with id: " + sess_c.id)
 					return callback(null,sess_c);
 				});
 			},
@@ -654,7 +654,7 @@ module.exports = {
 
 
 				    file.status = 'failed'
-				    file.error_info = "There was some errors processing the survey file"
+				    file.error_info = "There was some errors processing the session file"
 
 				    return cb(null)
 				})

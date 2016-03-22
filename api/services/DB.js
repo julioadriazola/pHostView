@@ -52,7 +52,7 @@ module.exports = {
 
 				function markFileAsProcessing(files,callback){
 					if(files.rows.length == 0) return sails.log.warn('Nothing to process');
-					sails.log(files.rows[0].basename)
+					sails.log(files.rows[0].basename + '(id: ' + files.rows[0].id + ')')
 
 					var file= files.rows[0];
 					file.status = 'processing';
@@ -85,7 +85,7 @@ module.exports = {
 
 				function markFileAsProcessing(files,callback){
 					if(files.rows.length == 0) return sails.log.warn('Nothing to process');
-					sails.log(files.rows[0].basename)
+                    sails.log(files.rows[0].basename + '(id: ' + files.rows[0].id + ')')
 
 					var file= files.rows[0];
 					file.status = 'processing';
