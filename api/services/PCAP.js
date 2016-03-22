@@ -36,6 +36,10 @@ module.exports = {
 					return FileProcessor.endProcess(null,file);
 				});
 			}
+			else{
+				file.status = 'waitingFile';
+				return FileProcessor.endProcess(null,file);
+			}
 		});
 	},
 
