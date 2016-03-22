@@ -20,11 +20,14 @@ module.exports = {
 
 	            	/*
 	            	 * There must be only one session per file.
+	            	 * The "-10000" value is to give a margin to the session, 
+	            	 * because it's happening that some procs, ports, powerstate
+	            	 * or wifistats are logged before the session starts.
 	            	 */
 
 	                q=`SELECT COUNT(*) c FROM (
 		                	SELECT
-								a.timestamp started_at,
+								a.timestamp started_at - 10000,
 								a.event start_event,
 								MIN(b.timestamp) ended_at,
 								b.event stop_event
@@ -47,7 +50,7 @@ module.exports = {
 
 
 	                q=`SELECT
-							a.timestamp started_at,
+							a.timestamp started_at - 10000,
 							a.event start_event,
 							MIN(b.timestamp) ended_at,
 							b.event stop_event
