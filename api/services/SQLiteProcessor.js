@@ -27,7 +27,7 @@ module.exports = {
 
 	                q=`SELECT COUNT(*) c FROM (
 		                	SELECT
-								a.timestamp started_at - 10000,
+								a.timestamp - 10000 started_at,
 								a.event start_event,
 								MIN(b.timestamp) ended_at,
 								b.event stop_event
@@ -50,7 +50,7 @@ module.exports = {
 
 
 	                q=`SELECT
-							a.timestamp started_at - 10000,
+							a.timestamp - 10000 started_at,
 							a.event start_event,
 							MIN(b.timestamp) ended_at,
 							b.event stop_event
