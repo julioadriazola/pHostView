@@ -279,11 +279,15 @@ module.exports = {
 			function createActivities(sess,callback){
 				var activities=[];
 				var act;
-				while(session.activity.length > 0){
-					act = session.activity.shift();
+				for(var i=0; i < session.activity.length; i++){
+					act = session.activity[i];
 					act.logged_at= new Date(act.timestamp);
 					act.session_id= sess.id;
 					act.user_name = act.user;
+
+					if(i+1 < session.activity.length && session.activity[i+1].timestamp > act.timestamp ) 
+						act.finished_at = new Date(session.activity[i+1].timestamp);
+					else act.finished_at = new Date(session.ended_at);
 
 					delete act.user;
 					delete act.timestamp;
