@@ -287,7 +287,7 @@ module.exports = {
 
 					if(i+1 < session.activity.length && session.activity[i+1].timestamp > act.timestamp ) 
 						act.finished_at = new Date(session.activity[i+1].timestamp);
-					else act.finished_at = new Date(session.ended_at);
+					else act.finished_at = new Date(Math.min(session.ended_at,act.timestamp+10000));
 
 					delete act.user;
 					delete act.timestamp;
