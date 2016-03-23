@@ -257,6 +257,8 @@ module.exports = {
 				if(session.best_ended_at) session.ended_at = session.best_ended_at			//In case that the session has no end
 				sess.started_at = new Date(session.started_at);
 				sess.ended_at = new Date(session.ended_at);
+				sess.start_event = session.start_event;
+				sess.stop_event = session.stop_event;
 				sess.file_id = file.id
 				sess.device_id = file.device_id
 
@@ -666,6 +668,10 @@ module.exports = {
 				    return cb(null)
 				})
 			else{
+				//ALL THE PROCESSING QUERYS HERE
+
+
+				//Fill the activity_io table
 				var q = `
 						INSERT INTO activity_io
 						SELECT 
@@ -693,6 +699,67 @@ module.exports = {
 					if(err) return sails.log.error("There was some error inserting to activity_io: " + err);
 					sails.log.info("Session (id: "+sess.id+") has inserted values to the activity_io");
 				});
+				
+
+				//Fill the processes_running table
+				q = `
+					INSERT INTO processes_running
+					SELECT
+						$1::integer as device_id,
+						$2::integer as session_id,
+						p.dname,
+						(
+							SELECT 
+								COUNT(*)
+							FROM
+							(
+								SELECT 1 AS count
+								FROM processes
+								WHERE LOWER(name) = p.dname
+									AND session_id = $3::integer
+									AND logged_at BETWEEN $4::timestamp AND $5::timestamp
+								GROUP BY date_trunc('minute',logged_at + interval '30 seconds')
+							) sq
+						)::integer AS process_running,
+						(
+							SELECT
+								EXTRACT (
+									EPOCH FROM (
+										LEAST(date_trunc('minute',ended_at + interval '30 seconds'), $6::timestamp) 
+										- 
+										GREATEST(date_trunc('minute',started_at + interval '30 seconds'), $7::timestamp)
+									)
+								)/60
+							FROM sessions 
+							WHERE id = $8::integer
+						) AS session_running,
+						$9::timestamp as start_at,
+						$10::timestamp as end_at
+					FROM(
+						SELECT
+						DISTINCT(LOWER(name)) AS dname
+						FROM processes
+						WHERE session_id = $11::integer
+					) p
+				`;
+				p = 60 * 60 * 1000;
+
+				var from = Math.floor(sess.started_at.getTime()/p)*p; 	//The started_at truncated to the hour in millisecond
+				var to 	 = Math.floor(sess.ended_at.getTime()/p+1)*p;	//The ended_at truncated to the hour + 1 hour in millisecond
+
+				for(var i = 0; from+i*p < to; i++){
+					var f= new Date(from + i*p);
+					var t= new Date(from + (i+1)*p);
+					var args=[sess.device_id,sess.id,sess.id,f,t,t,f,sess.id,f,t,sess.id];
+					DB.query(q,args,function(err,result){
+						if(err) return sails.log.error("There was some error inserting values to processes_running: " + err);
+						sails.log.info("Session (id: "+sess.id+") has inserted values to the processes_running table");
+					});
+				}
+
+
+
+
 				return cb(err); //Go to the next file
 			}
 		});
