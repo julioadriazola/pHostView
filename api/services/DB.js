@@ -295,6 +295,13 @@ module.exports = {
     		else if(result) nextFunction(err,result)
     		else (err,null)
     	});
-    }
+    },
+
+    query: function(query,args,nextFunction){
+        if(!pgsql) DB.start();
+
+        pgsql.query(query,args,nextFunction);
+
+    },
 
 }

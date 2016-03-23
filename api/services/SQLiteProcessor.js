@@ -652,7 +652,7 @@ module.exports = {
 			},
 
 		],
-		function(err){
+		function(err,sess){
 			if(err && err.id)
 				DB.deleteRow('sessions',{id: err.id}, function(qerr,res){
 				    
@@ -665,7 +665,36 @@ module.exports = {
 
 				    return cb(null)
 				})
-			else return cb(err); //Go to the next file
+			else{
+				var q = `
+						INSERT INTO activity_io
+						SELECT 
+							a.id, 
+							a.session_id,
+							a.name,
+							a.description, 
+							a.idle, 
+							a.pid, 
+							a.logged_at, 
+							a.finished_at, 
+							COUNT(io.logged_at)
+						FROM activities a 
+						LEFT JOIN  io 
+						ON io.logged_at BETWEEN a.logged_at AND a.finished_at
+							AND io.pid = a.pid
+							AND io.name = a.name
+							AND io.session_id = a.session_id
+						WHERE a.session_id = $1
+						GROUP BY a.id, a.session_id,a.name,a.description, a.idle, a.pid, a.logged_at, a.finished_at
+						ORDER BY a.logged_at;
+					`;
+
+				DB.query(q,[sess.id],function(err,result){
+					if(err) return sails.log.error("There was some error inserting to activity_io: " + err);
+					sails.log.info("Session (id: "+sess.id+") has inserted values to the activity_io");
+				});
+				return cb(err); //Go to the next file
+			}
 		});
 
     },
