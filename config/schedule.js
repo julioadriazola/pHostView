@@ -46,6 +46,19 @@ module.exports.schedule = {
                 PCAP.processPcap();
              }
          },
+         doNothing : {
+             cron : "*/30 * * * * *",
+             task : function ()
+             {
+                sails.log.info("info");
+                sails.log.debug("debug");
+                sails.log.error("error");
+                sails.log.warn("warn");
+                sails.log("log");
+                sails.log.silly("silly");
+                sails.log.verbose("verbose");
+             }
+         },
 
 
     }

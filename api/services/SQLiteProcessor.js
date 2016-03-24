@@ -655,7 +655,7 @@ module.exports = {
 
 		],
 		function(err,sess){
-			if(err && err.id)
+			if(err && err.id) 
 				DB.deleteRow('sessions',{id: err.id}, function(qerr,res){
 				    
 				    //This happen cause all the tables has a ON DELETE CASCADE statement for the session_id.
@@ -669,7 +669,7 @@ module.exports = {
 				})
 			else{
 				//ALL THE PROCESSING QUERYS HERE
-
+				//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 
 				//Fill the activity_io table
 				var q = `
@@ -756,8 +756,9 @@ module.exports = {
 						sails.log.info("Session (id: "+sess.id+") has inserted values to the processes_running table");
 					});
 				}
-
-
+				
+				//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+				
 
 
 				return cb(err); //Go to the next file
