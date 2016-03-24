@@ -57,6 +57,6 @@ module.exports.pcapProcessing = {
   script: 'DEV.py'
 };
 
-module.exports.log{
+module.exports.log = {
   level: 'silly'
 };
