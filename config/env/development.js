@@ -55,4 +55,8 @@ module.exports.pcapProcessing = {
     scriptPath: '/home/jadriazo/pcapProcessing'
   },
   script: 'DEV.py'
-}
+};
+
+module.exports.log{
+  level: 'silly'
+};
