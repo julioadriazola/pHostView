@@ -15,7 +15,8 @@ module.exports.schedule = {
              }
          },
          resetOtherFiles : {
-             cron : "25 3 * * *",
+             cron : "25 * * * *",
+             // cron : "25 3 * * *",
              task : function ()
              {
                 sails.log.info("resetOtherFiles task fired");
@@ -23,7 +24,8 @@ module.exports.schedule = {
              }
          },
          runOtherFiles : {
-             cron : "30 3 * * *",
+             cron : "30 * * * *",
+             // cron : "30 3 * * *",
              task : function ()
              {
                 sails.log.info("runOtherFiles task fired");
@@ -31,7 +33,8 @@ module.exports.schedule = {
              }
          },
          resetPcapFiles : {
-             cron : "25 5 * * *",
+             cron : "40 * * * *",
+             // cron : "25 5 * * *",
              task : function ()
              {
                 sails.log.info("resetPcapFiles task fired");
@@ -39,7 +42,8 @@ module.exports.schedule = {
              }
          },
          processPcapFiles : {
-             cron : "30 5 * * *",
+             cron : "45 * * * *",
+             // cron : "30 5 * * *",
              task : function ()
              {
                 sails.log.info("processPcapFiles task fired");
