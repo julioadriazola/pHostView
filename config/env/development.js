@@ -58,5 +58,5 @@ module.exports.pcapProcessing = {
 };
 
 module.exports.log = {
-  level: 'silly'
+  level: 'info'
 };
