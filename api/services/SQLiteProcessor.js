@@ -286,6 +286,7 @@ module.exports = {
 					act.logged_at= new Date(act.timestamp);
 					act.session_id= sess.id;
 					act.user_name = act.user;
+					act.name = act.name.toLowerCase();
 
 					if(i+1 < session.activity.length && session.activity[i+1].timestamp > act.timestamp ) 
 						act.finished_at = new Date(session.activity[i+1].timestamp);
@@ -344,6 +345,7 @@ module.exports = {
 					io = session.io.shift();
 
 					io.logged_at = new Date(io.timestamp);
+					io.name = io.name.toLowerCase();
 
 					io.session_id= sess.id;
 
@@ -368,6 +370,7 @@ module.exports = {
 					port.destination_ip = port.destip.length > 0?port.destip:null;
 					port.source_port = port.srcport
 					port.destination_port = port.destip.length > 0?port.destport:null;
+					port.name = port.name.toLowerCase();
 
 					port.session_id= sess.id;
 
@@ -392,6 +395,7 @@ module.exports = {
 					proc = session.procs.shift();
 
 					proc.logged_at = new Date(proc.timestamp);
+					proc.name = proc.name.toLowerCase();
 
 					proc.session_id= sess.id;
 
@@ -715,9 +719,9 @@ module.exports = {
 							(
 								SELECT 1 AS count
 								FROM processes
-								WHERE LOWER(name) = p.dname
-									AND session_id = $3::integer
-									AND logged_at BETWEEN $4::timestamp AND $5::timestamp
+								WHERE name = p.dname
+									AND session_id = $2::integer
+									AND logged_at BETWEEN $3::timestamp AND $4::timestamp
 								GROUP BY date_trunc('minute',logged_at + interval '30 seconds')
 							) sq
 						)::integer AS process_running,
@@ -725,21 +729,21 @@ module.exports = {
 							SELECT
 								EXTRACT (
 									EPOCH FROM (
-										LEAST(date_trunc('minute',ended_at + interval '30 seconds'), $6::timestamp) 
+										LEAST(date_trunc('minute',ended_at + interval '30 seconds'), $4::timestamp) 
 										- 
-										GREATEST(date_trunc('minute',started_at + interval '30 seconds'), $7::timestamp)
+										GREATEST(date_trunc('minute',started_at + interval '30 seconds'), $3::timestamp)
 									)
 								)/60
 							FROM sessions 
-							WHERE id = $8::integer
+							WHERE id = $2::integer
 						) AS session_running,
-						$9::timestamp as start_at,
-						$10::timestamp as end_at
+						$3::timestamp as start_at,
+						$4::timestamp as end_at
 					FROM(
 						SELECT
-						DISTINCT(LOWER(name)) AS dname
+						DISTINCT name AS dname
 						FROM processes
-						WHERE session_id = $11::integer
+						WHERE session_id = $2::integer
 					) p
 				`;
 				p = 60 * 60 * 1000;
@@ -750,15 +754,15 @@ module.exports = {
 				for(var i = 0; from+i*p < to; i++){
 					var f= new Date(from + i*p);
 					var t= new Date(from + (i+1)*p);
-					var args=[sess.device_id,sess.id,sess.id,f,t,t,f,sess.id,f,t,sess.id];
+					var args=[sess.device_id,sess.id,f,t];
 					DB.query(q,args,function(err,result){
 						if(err) return sails.log.error("There was some error inserting values to processes_running: " + err);
 						sails.log.info("Session (id: "+sess.id+") has inserted values to the processes_running table");
 					});
 				}
-				
+
 				//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
-				
+
 
 
 				return cb(err); //Go to the next file

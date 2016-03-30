@@ -2,7 +2,7 @@
 
 This is the *main* of the processing feature. All the _raw_ files will be processed in the next way:
 
-1. An unprocessed file will be picked from the Database and the status will be changed to "processing"
+1. An unprocessed (status: 'uploaded') file will be picked from the Database and the status will be changed to "processing".
 2. Determine whether or not the file name extesion is supported for processing.
 2. Base on the name of the file, determine whether or not the _parent_ exists. The parent is the object that creates the link with the session. For a sqlite file there's no parent (because it contains the session), for pcap files the parent is a connection, and for the rest the parent is a session.
 3. If the parent exists, the file will be decompressed (No decompress action is made on the pcap files in this step).
@@ -22,7 +22,7 @@ The process function of this service will perform the next tasks:
 
 Some considerations:
 
-* The db.serialize will run all the code, and each db.each will be attached to a query BUT the query will not be executed immediately. For that reason, it's important not to process the results outside the db.each because the object will not exist. For example:
+* The db.serialize will run all the code, and each db.each will be attached to a queu BUT the query will not be executed immediately. For that reason, it's important not to process the results outside the db.each because the object will not exist. For example:
 ```javascript
 //...
 var db = new sqlite.Database(someFile);
@@ -66,7 +66,7 @@ TODO: NOT IMPLEMENTED YET
 
 # PCAP.js
 
-In this case, the process function only execute the first step of the processing. In this case only _last_ pcap files parts are processed. First, it's important to understand the format of an uploaded pcap file. 
+In this case, the process function only execute the first step of the processing. Only _last_ pcap files parts are processed. First, it's important to understand the format of an uploaded pcap file. 
 
 ```javascript
 var filename = '1456319539491_1456319542873_4_A2692622-D935-45DD-BC6A-0FEA4F88524C_last.pcap.zip';
@@ -85,4 +85,4 @@ An important point here is that for all related parts (i.e. from the same pcap) 
 2. Then, the last part index + 1 will be compared with the numbers of pcap parts we've got from the _selecPCAPParts_. If the numbers don't match, the file will be marked as waitingFile and the FileProcessor.endProcess function will be called.
 3. If the numbers match, a _pcap_ row will be inserted with an uploaded status and the _pcap\_file_ table will be filled. Finally, all the files involved (all the parts) will be marked as processed, and the FileProcessor.endProcess function will be called.
 
-A second important function will be called from the schedules (config/schedule.js), that is the _processPCAP_ function. What it does is basically call the python processing function for the pcap files. This is the most resource consuming function, and when is called nothing will be displayed until the script finishes. To read more about this, see the [Pcap Processing](https://github.com/julioadriazola/pcapProcessing) repository.
+A second important function will be called from the schedules (config/schedule.js), that is the _processPCAP_ function. What it does is basically call the python processing function for the pcap files. This is the most resource consuming function, and when is called nothing will be displayed in the nodejs console until the script finishes. To read more about this, see the [Pcap Processing](https://github.com/julioadriazola/pcapProcessing) repository.

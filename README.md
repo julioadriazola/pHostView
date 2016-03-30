@@ -1,3 +1,9 @@
+#IMPORTANT: THE CONFIG/SCHEDULE.JS IS IN A 'DEVELOPMENT' VERSION, SO IT'S RUNNING THE TASKS MORE OFTEN THAN IT SHOULD.
+
+*******************
+*******************
+*******************
+*******************
 # HostView application
 
 The HostView application is compossed of 4 parts that are saved to 4 github repos:
